@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Warhammer Tournament</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCCR2svGRjs1SPPnY-F8hZ5zgZu3iqhDOY",
+    authDomain: "turnausapp-f3e21.firebaseapp.com",
+    databaseURL: "https://turnausapp-f3e21-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "turnausapp-f3e21",
+    storageBucket: "turnausapp-f3e21.firebasestorage.app",
+    messagingSenderId: "483651206452",
+    appId: "1:483651206452:web:24c3ec18f861b47f6d3961"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+
+  window.__fbSet = (path, data) => set(ref(db, path), data);
+  window.__fbOn  = (path, cb)   => onValue(ref(db, path), snap => cb(snap.val()));
+</script>
+</head>
+<body>
+<div id="root"></div>
+<!-- Data & logic (plain JS, no JSX) -->
+<script src="js/data.js"></script>
+<script src="js/logic.js"></script>
+<script src="js/ui-styles.js"></script>
+<!-- React app (JSX compiled by Babel) -->
+<script type="text/babel" src="js/app.jsx"></script>
+</body>
+</html>

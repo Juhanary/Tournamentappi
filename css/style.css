@@ -1,0 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;900&family=Crimson+Pro:wght@300;400;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{
+  --blood:#8B0000;--gold:#C9A84C;--gl:#E8C97A;
+  --dark:#0D0A07;--d2:#1A1410;--d3:#241E18;
+  --steel:#8A8070;--text:#E8D9B8;
+  --win:#88FF88;--draw:#FFD970;--loss:#FF8888;
+}
+html,body,#root{height:100%;background:var(--dark);}
+body{font-family:'Crimson Pro',serif;font-size:16px;color:var(--text);overscroll-behavior:none;}
+button{cursor:pointer;font-family:'Crimson Pro',serif;}
+input,select{font-family:'Crimson Pro',serif;}
+::-webkit-scrollbar{width:3px;height:3px;}
+::-webkit-scrollbar-thumb{background:rgba(201,168,76,.3);border-radius:2px;}
