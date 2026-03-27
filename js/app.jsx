@@ -349,16 +349,18 @@ function ScenarioPicker({value, onChange}) {
 
 function SecObjPicker({scenario, value, onChange}) {
   const sc = SCENARIOS.find(s=>s.id===scenario);
-  if (!sc) return null;
-  const required = sc.secRequired;
-  const allowed  = sc.secAllowed;
+  const required = sc?.secRequired || [];
+  const allowed  = sc?.secAllowed  || [];
   const allKeys  = [...new Set([...required,...allowed])];
 
   useEffect(()=>{
+    if (!sc) return;
     const newVal = {...value};
     required.forEach(k=>{ newVal[k]=true; });
     onChange(newVal);
   },[scenario]);
+
+  if (!sc) return null;
 
   return <div style={{display:'flex',flexDirection:'column',gap:6}}>
     {allKeys.map(k=>{
@@ -533,7 +535,7 @@ function RoundScenarioModal({roundNum, initial, onSave, onClose}) {
 function StartScreen({onStart}) {
   const [name,    setName]    = useState('Warhammer: The Old World');
   const [rounds,  setRounds]  = useState(5);
-  const [tables,  setTables]  = useState(8);
+  const [tables,  setTables]  = useState(5);
   const [scoring, setScoring] = useState('tow');
   const [bpTable, setBpTable] = useState(JSON.parse(JSON.stringify(DEFAULT_BP)));
   const [showBP,  setShowBP]  = useState(false);
