@@ -13,29 +13,79 @@ const DEFAULT_BP_AOS = [
   {lo:1, hi:5,     w:13},
   {lo:5, hi:99999, w:20},
 ];
-
-// ═══════════════════════════════════
-//  40K MISSIONS  (table 44"×60")
-// ═══════════════════════════════════
-// deploy types: 'long-N', 'short-N', 'diagonal', 'diagonal-corner-N'
-const MISSIONS_40K = [
-  {id:1, name:'Search and Destroy',   deploy:'diagonal',          desc:'Triangular zones – diagonal cut corner to corner.',          objectives:[{x:.5,y:.5},{x:.25,y:.25},{x:.75,y:.25},{x:.25,y:.75},{x:.75,y:.75}]},
-  {id:2, name:'Tipping Point',        deploy:'long-9',            desc:'Deployment along long table edges, 9" deep.',               objectives:[{x:.5,y:.5},{x:.2,y:.35},{x:.8,y:.35},{x:.2,y:.65},{x:.8,y:.65}]},
-  {id:3, name:'Close Engagement',     deploy:'short-9',           desc:'Deployment along short table edges, 9" deep.',              objectives:[{x:.5,y:.5},{x:.35,y:.2},{x:.35,y:.8},{x:.65,y:.2},{x:.65,y:.8}]},
-  {id:4, name:'Hammer and Anvil',     deploy:'short-12',          desc:'Deployment along short table edges, 12" deep.',             objectives:[{x:.5,y:.5},{x:.33,y:.25},{x:.33,y:.75},{x:.67,y:.25},{x:.67,y:.75}]},
-  {id:5, name:'Crucible of Battle',   deploy:'diagonal-corner-12',desc:'Angled deployment zones from opposite corners, 12" deep.',  objectives:[{x:.5,y:.5},{x:.25,y:.3},{x:.75,y:.3},{x:.25,y:.7},{x:.75,y:.7}]},
-  {id:6, name:'Dawn of War',          deploy:'long-6',            desc:'Deployment along long table edges, only 6" deep.',          objectives:[{x:.5,y:.5},{x:.2,y:.4},{x:.8,y:.4},{x:.2,y:.6},{x:.8,y:.6}]},
+// Simple W/D/L: any VP diff ≥1 = Win(20BP), diff=0 = Draw(10BP)
+const SIMPLE_BP_TABLE = [
+  {lo:0, hi:1,     w:10},
+  {lo:1, hi:99999, w:20},
 ];
 
 // ═══════════════════════════════════
-//  AOS MISSIONS  (table 44"×60")
+//  40K & AOS MISSIONS
+//  Landscape orientation: table 60"(W) × 44"(H)
+//  Long edges  = top & bottom (60" wide) → 'long-N'  zones: top/bottom strips
+//  Short edges = left & right (44" tall) → 'short-N' zones: left/right strips
+//  Objectives: x=0..1 (left→right), y=0..1 (top→bottom)
+// ═══════════════════════════════════
+const MISSIONS_40K = [
+  // 1. Search & Destroy — diagonal, each player in a triangular half
+  {id:1, name:'Search and Destroy', deploy:'diagonal',
+   desc:'Diagonal split. P1 top-left triangle, P2 bottom-right. Table 44"×60".',
+   objectives:[{x:.5,y:.5},{x:.22,y:.27},{x:.78,y:.73},{x:.5,y:.18},{x:.5,y:.82}]},
+
+  // 2. Tipping Point — 9" from long (top/bottom) edges
+  {id:2, name:'Tipping Point', deploy:'long-9',
+   desc:'Deploy within 9" of long edge. No-man\'s-land 26". Table 44"×60".',
+   objectives:[{x:.5,y:.5},{x:.2,y:.3},{x:.8,y:.3},{x:.2,y:.7},{x:.8,y:.7}]},
+
+  // 3. Close Engagement — 9" from short (left/right) edges
+  {id:3, name:'Close Engagement', deploy:'short-9',
+   desc:'Deploy within 9" of short edge. No-man\'s-land 42". Table 44"×60".',
+   objectives:[{x:.5,y:.5},{x:.3,y:.2},{x:.3,y:.8},{x:.7,y:.2},{x:.7,y:.8}]},
+
+  // 4. Hammer and Anvil — 12" from short (left/right) edges
+  {id:4, name:'Hammer and Anvil', deploy:'short-12',
+   desc:'Deploy within 12" of short edge. No-man\'s-land 36". Table 44"×60".',
+   objectives:[{x:.5,y:.5},{x:.33,y:.2},{x:.33,y:.8},{x:.67,y:.2},{x:.67,y:.8}]},
+
+  // 5. Crucible of Battle — triangular corner zones, 18" legs
+  {id:5, name:'Crucible of Battle', deploy:'diagonal-corner-18',
+   desc:'Triangular corner zones, 18" along each edge. Table 44"×60".',
+   objectives:[{x:.5,y:.5},{x:.25,y:.3},{x:.75,y:.7},{x:.5,y:.22},{x:.5,y:.78}]},
+
+  // 6. Dawn of War — 6" from long (top/bottom) edges
+  {id:6, name:'Dawn of War', deploy:'long-6',
+   desc:'Deploy within 6" of long edge. No-man\'s-land 32". Table 44"×60".',
+   objectives:[{x:.5,y:.5},{x:.2,y:.36},{x:.8,y:.36},{x:.2,y:.64},{x:.8,y:.64}]},
+];
+
+// ═══════════════════════════════════
+//  AOS MISSIONS  (table 44"×60", landscape)
 // ═══════════════════════════════════
 const MISSIONS_AOS = [
-  {id:1, name:'Savage Gains',           deploy:'long-12',            desc:'Deployment along long edges, 12" deep.',           objectives:[{x:.5,y:.5},{x:.25,y:.5},{x:.75,y:.5},{x:.5,y:.28},{x:.5,y:.72}]},
-  {id:2, name:'Ours for the Taking',    deploy:'diagonal',           desc:'Diagonal split – triangular deployment zones.',    objectives:[{x:.5,y:.5},{x:.25,y:.4},{x:.75,y:.6},{x:.5,y:.25},{x:.5,y:.75}]},
-  {id:3, name:'Battle for the Pass',    deploy:'short-12',           desc:'Deployment along short edges, 12" deep.',          objectives:[{x:.5,y:.5},{x:.33,y:.3},{x:.67,y:.3},{x:.33,y:.7},{x:.67,y:.7}]},
-  {id:4, name:'Tectonic Interference',  deploy:'diagonal-corner-12', desc:'Corner deployment zones, angled 12" from edge.',   objectives:[{x:.5,y:.5},{x:.3,y:.35},{x:.7,y:.65},{x:.7,y:.35},{x:.3,y:.65}]},
-  {id:5, name:'Clash of Spearheads',    deploy:'long-9',             desc:'Deployment along long edges, 9" deep.',            objectives:[{x:.5,y:.5},{x:.25,y:.33},{x:.75,y:.33},{x:.25,y:.67},{x:.75,y:.67}]},
+  // 1. Savage Gains — 12" from long edges, 3 objectives on centre line
+  {id:1, name:'Savage Gains', deploy:'long-12',
+   desc:'Deploy within 12" of long edge. No-man\'s-land 20". Table 44"×60".',
+   objectives:[{x:.5,y:.5},{x:.2,y:.5},{x:.8,y:.5},{x:.5,y:.28},{x:.5,y:.72}]},
+
+  // 2. Ours for the Taking — diagonal
+  {id:2, name:'Ours for the Taking', deploy:'diagonal',
+   desc:'Diagonal deployment split. Table 44"×60".',
+   objectives:[{x:.5,y:.5},{x:.25,y:.25},{x:.75,y:.75},{x:.25,y:.75},{x:.75,y:.25}]},
+
+  // 3. Battle for the Pass — 12" from short edges
+  {id:3, name:'Battle for the Pass', deploy:'short-12',
+   desc:'Deploy within 12" of short edge. No-man\'s-land 36". Table 44"×60".',
+   objectives:[{x:.5,y:.5},{x:.33,y:.25},{x:.33,y:.75},{x:.67,y:.25},{x:.67,y:.75}]},
+
+  // 4. Tectonic Interference — corner triangles, 14" legs
+  {id:4, name:'Tectonic Interference', deploy:'diagonal-corner-14',
+   desc:'Triangular corner zones, 14" legs. Table 44"×60".',
+   objectives:[{x:.5,y:.5},{x:.3,y:.3},{x:.7,y:.7},{x:.3,y:.7},{x:.7,y:.3}]},
+
+  // 5. Clash of Spearheads — 9" from long edges
+  {id:5, name:'Clash of Spearheads', deploy:'long-9',
+   desc:'Deploy within 9" of long edge. No-man\'s-land 26". Table 44"×60".',
+   objectives:[{x:.5,y:.5},{x:.25,y:.33},{x:.75,y:.33},{x:.25,y:.67},{x:.75,y:.67}]},
 ];
 
 // ═══════════════════════════════════

@@ -69,8 +69,9 @@ function BPModal({table,onSave,onClose}) {
   </div></div>;
 }
 
-function QRModal({url, onClose}) {
+function QRModal({url, onClose, onCopy}) {
   const qrRef = useRef();
+  const [copied, setCopied] = useState(false);
   useEffect(()=>{
     if (qrRef.current && window.QRCode) {
       qrRef.current.innerHTML = '';
@@ -81,6 +82,9 @@ function QRModal({url, onClose}) {
       });
     }
   },[url]);
+  function copyLink() {
+    navigator.clipboard?.writeText(url).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2000);onCopy&&onCopy();});
+  }
   return <div style={S.overlay} onClick={onClose}>
     <div style={{...S.modalBox,maxWidth:300,textAlign:'center'}} onClick={e=>e.stopPropagation()}>
       <div style={{fontFamily:'Cinzel,serif',color:'var(--gold)',fontSize:14,marginBottom:4,letterSpacing:'.08em'}}>📡 Live Standings</div>
@@ -89,16 +93,18 @@ function QRModal({url, onClose}) {
       </div>
       <div ref={qrRef} style={{display:'inline-block',padding:12,background:'var(--d3)',borderRadius:6,border:'1px solid rgba(201,168,76,.3)'}}/>
       <div style={{fontSize:11,color:'var(--steel)',marginTop:12,wordBreak:'break-all',lineHeight:1.4}}>{url}</div>
-      <button style={{...S.btn('gold'),marginTop:14,marginBottom:0}} onClick={()=>navigator.clipboard?.writeText(url).then(()=>{})}>Copy Link</button>
-      <button style={{...S.btn('outline'),marginBottom:0,marginTop:8}} onClick={onClose}>Close</button>
+      <button style={{...S.btn('gold'),marginTop:14,marginBottom:0}} onClick={copyLink}>
+        {copied ? '✓ Linkki kopioitu!' : '📋 Kopioi linkki'}
+      </button>
+      <button style={{...S.btn('outline'),marginBottom:0,marginTop:8}} onClick={onClose}>Sulje</button>
     </div>
   </div>;
 }
 
-function SaveModal({adminUrl, onClose}) {
+function SaveModal({adminUrl, onClose, onCopy}) {
   const [copied, setCopied] = useState(false);
   function copy() {
-    navigator.clipboard?.writeText(adminUrl).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2000);});
+    navigator.clipboard?.writeText(adminUrl).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2000);onCopy&&onCopy();});
   }
   return <div style={S.overlay} onClick={onClose}>
     <div style={{...S.modalBox,maxWidth:320}} onClick={e=>e.stopPropagation()}>
@@ -315,12 +321,39 @@ function ViewerScreen({tourneyId}) {
         {tab==='standings'&&<Card title="🏆 Standings">
           <StandingsTable standings={standings} round={round} live={true}/>
         </Card>}
-        {tab==='rounds'&&<Card title="🗺 Scenarios & Rules">
-          <ViewerRoundCard
-            roundScenarios={cfg.roundScenarios}
-            currentRound={round}
-          />
-        </Card>}
+        {tab==='rounds'&&(cfg.game==='tow'
+          ? <Card title="🗺 Scenarios & Rules">
+              <ViewerRoundCard roundScenarios={cfg.roundScenarios} currentRound={round}/>
+            </Card>
+          : (cfg.game==='40k'||cfg.game==='aos')
+            ? <Card title="🗺 Missions">
+                <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                  {(cfg.roundMissions||[]).map((mId,i)=>{
+                    const missions = cfg.game==='40k' ? MISSIONS_40K : MISSIONS_AOS;
+                    const m = missions.find(x=>x.id===mId)||missions[0];
+                    const rn = i+1;
+                    const isCur = rn===round;
+                    const isPast = rn<round;
+                    return <div key={i} style={{background:'var(--d2)',
+                      border:`1px solid ${isCur?'var(--gold)':isPast?'rgba(201,168,76,.12)':'rgba(201,168,76,.2)'}`,
+                      borderRadius:4,overflow:'hidden',opacity:rn>round?.7:1,padding:'10px 12px'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+                        {isCur&&<span style={{width:7,height:7,borderRadius:'50%',background:'var(--win)',
+                          boxShadow:'0 0 5px var(--win)',flexShrink:0,display:'inline-block'}}/>}
+                        {isPast&&<span style={{fontSize:11,color:'var(--steel)'}}>✓</span>}
+                        <span style={{fontFamily:'Cinzel,serif',fontSize:11,
+                          color:isCur?'var(--gold)':'var(--steel)',letterSpacing:'.05em'}}>
+                          Round {rn}{isCur?' — NOW PLAYING':''}
+                        </span>
+                        <span style={{fontSize:11,color:'var(--text)',marginLeft:4}}>{m.name}</span>
+                      </div>
+                      <DeployMapSVG mission={m} style={{borderRadius:3,border:'1px solid rgba(201,168,76,.15)'}}/>
+                    </div>;
+                  })}
+                </div>
+              </Card>
+            : null
+        )}
       </div>
     </div>
   );
@@ -564,9 +597,9 @@ const GAMES = [
 ];
 const GAME_DEFAULTS = {
   tow:    {name:'Warhammer: The Old World', scoring:'tow',    bpTable:()=>JSON.parse(JSON.stringify(DEFAULT_BP))},
-  '40k':  {name:'Warhammer 40,000',         scoring:'simple', bpTable:()=>JSON.parse(JSON.stringify(DEFAULT_BP))},
+  '40k':  {name:'Warhammer 40,000',         scoring:'simple', bpTable:()=>JSON.parse(JSON.stringify(SIMPLE_BP_TABLE))},
   aos:    {name:'Age of Sigmar',            scoring:'aos',    bpTable:()=>JSON.parse(JSON.stringify(DEFAULT_BP_AOS))},
-  generic:{name:'Turnaus',                  scoring:'simple', bpTable:()=>JSON.parse(JSON.stringify(DEFAULT_BP))},
+  generic:{name:'Turnaus',                  scoring:'simple', bpTable:()=>JSON.parse(JSON.stringify(SIMPLE_BP_TABLE))},
 };
 
 function StartScreen({onStart}) {
@@ -576,10 +609,11 @@ function StartScreen({onStart}) {
   const [tables,    setTables]    = useState(5);
   const [scoring,   setScoring]   = useState('tow');
   const [bpTable,   setBpTable]   = useState(JSON.parse(JSON.stringify(DEFAULT_BP)));
-  const [missionId, setMissionId] = useState(1);
   const [showBP,    setShowBP]    = useState(false);
   const [roundScenarios, setRoundScenarios] = useState([]);
+  const [roundMissions,  setRoundMissions]  = useState([]);
   const [editingRound,   setEditingRound]   = useState(null);
+  const [editingMission, setEditingMission] = useState(null);
 
   function selectGame(g) {
     setGame(g);
@@ -587,7 +621,6 @@ function StartScreen({onStart}) {
     setName(d.name);
     setScoring(d.scoring);
     setBpTable(d.bpTable());
-    setMissionId(1);
   }
 
   useEffect(()=>{
@@ -598,6 +631,14 @@ function StartScreen({onStart}) {
     });
   },[rounds]);
 
+  useEffect(()=>{
+    setRoundMissions(prev=>{
+      const next=[];
+      for(let i=0;i<rounds;i++) next.push(prev[i]||1);
+      return next;
+    });
+  },[rounds,game]);
+
   const drawRow  = bpTable.find(r=>r.w===10);
   const maxRow   = [...bpTable].sort((a,b)=>b.w-a.w)[0];
   const drawUpto = drawRow?(drawRow.hi>=99999?'∞':drawRow.hi):'–';
@@ -605,6 +646,10 @@ function StartScreen({onStart}) {
   function saveRound(rn, data) {
     setRoundScenarios(prev=>prev.map((r,i)=>i===rn-1?data:r));
     setEditingRound(null);
+  }
+  function saveMission(rn, mId) {
+    setRoundMissions(prev=>prev.map((v,i)=>i===rn-1?mId:v));
+    setEditingMission(null);
   }
 
   return (
@@ -620,6 +665,12 @@ function StartScreen({onStart}) {
         initial={roundScenarios[editingRound-1]}
         onSave={d=>saveRound(editingRound,d)}
         onClose={()=>setEditingRound(null)}/>}
+      {editingMission&&<RoundMissionModal
+        roundNum={editingMission}
+        game={game}
+        currentId={roundMissions[editingMission-1]}
+        onSave={mId=>saveMission(editingMission,mId)}
+        onClose={()=>setEditingMission(null)}/>}
 
       <div style={{textAlign:'center',padding:'40px 20px 28px',borderBottom:'1px solid rgba(201,168,76,.2)'}}>
         <div style={{fontSize:32,marginBottom:8}}>⚔</div>
@@ -710,27 +761,35 @@ function StartScreen({onStart}) {
 
         {(game==='40k'||game==='aos')&&(()=>{
           const missions = game==='40k' ? MISSIONS_40K : MISSIONS_AOS;
-          const sel = missions.find(m=>m.id===missionId)||missions[0];
-          return <Card title="🗺 Mission">
-            <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:10}}>
-              {missions.map(m=>(
-                <div key={m.id} onClick={()=>setMissionId(m.id)}
-                  style={{display:'flex',gap:10,padding:'8px 10px',cursor:'pointer',borderRadius:3,
-                    border:`1px solid ${missionId===m.id?'var(--gold)':'rgba(201,168,76,.18)'}`,
-                    background:missionId===m.id?'rgba(201,168,76,.07)':'var(--d3)',alignItems:'center'}}>
-                  <div style={{width:12,height:12,borderRadius:'50%',flexShrink:0,
-                    border:`2px solid ${missionId===m.id?'var(--gold)':'var(--steel)'}`,
-                    display:'flex',alignItems:'center',justifyContent:'center'}}>
-                    {missionId===m.id&&<div style={{width:6,height:6,borderRadius:'50%',background:'var(--gold)'}}/>}
+          return <Card title="🗺 Missions — one per round">
+            <div style={{display:'flex',flexDirection:'column',gap:6}}>
+              {roundMissions.map((mId,i)=>{
+                const m=missions.find(x=>x.id===mId)||missions[0];
+                return (
+                  <div key={i}
+                    style={{display:'flex',gap:10,alignItems:'center',padding:'9px 12px',
+                      background:'var(--d3)',border:'1px solid rgba(201,168,76,.18)',borderRadius:3}}>
+                    <div style={{width:52,flexShrink:0,borderRadius:2,overflow:'hidden',border:'1px solid rgba(201,168,76,.2)'}}>
+                      <DeployMapSVG mission={m} style={{display:'block'}}/>
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontFamily:'Cinzel,serif',fontSize:11,color:'var(--gold)',
+                        letterSpacing:'.05em',marginBottom:2}}>
+                        Round {i+1} · {m.name}
+                      </div>
+                      <div style={{fontSize:11,color:'var(--steel)',lineHeight:1.3,
+                        whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                        {m.deploy}
+                      </div>
+                    </div>
+                    <button style={{...S.btn('outline',true),fontSize:10,flexShrink:0}}
+                      onClick={()=>setEditingMission(i+1)}>
+                      Edit
+                    </button>
                   </div>
-                  <div>
-                    <div style={{fontFamily:'Cinzel,serif',fontSize:11,color:'var(--gold)'}}>{m.id}. {m.name}</div>
-                    <div style={{fontSize:11,color:'var(--steel)'}}>{m.desc}</div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-            <DeployMapSVG mission={sel} style={{borderRadius:3,border:'1px solid rgba(201,168,76,.2)'}}/>
           </Card>;
         })()}
 
@@ -780,8 +839,8 @@ function StartScreen({onStart}) {
               name:name.trim(),rounds,tables,scoring,
               bpTable,
               game,
-              missionId,
-              roundScenarios:game==='tow'?roundScenarios:[],
+              roundMissions:  (game==='40k'||game==='aos') ? roundMissions : [],
+              roundScenarios: game==='tow' ? roundScenarios : [],
             });
           }}>
           ⚔ Start Tournament
@@ -793,119 +852,313 @@ function StartScreen({onStart}) {
 
 // ═══════════════════════════════════
 //  DEPLOYMENT MAP SVG
+//  Landscape: TW=60"(width) × TH=44"(height)
+//  long-N  → top & bottom strips (along 60" edges, depth N")
+//  short-N → left & right strips (along 44" edges, depth N")
 // ═══════════════════════════════════
 function DeployMapSVG({mission, style={}}) {
-  const TW = 44, TH = 60; // table inches
-  const SC = 6;            // px per inch
-  const W  = TW*SC, H = TH*SC;
-  const PAD = 30;          // space for labels
-  const VW  = W + PAD*2, VH = H + PAD*2;
-  const ox  = PAD, oy = PAD;
+  const TW=60, TH=44;   // table inches, landscape
+  const SC=6;            // px per inch
+  const W=TW*SC, H=TH*SC;
+  const PAD=28;
+  const VW=W+PAD*2, VH=H+PAD*2;
+  const ox=PAD, oy=PAD;
+  const C1='rgba(139,0,0,.6)';
+  const C2='rgba(0,60,139,.6)';
+  const CS='#C9A84C';
+  const TXT='#C8B87A';
 
-  const C1 = 'rgba(139,0,0,.55)';
-  const C2 = 'rgba(0,60,139,.55)';
-  const CS = '#C9A84C';    // gold stroke
-  const TXT = '#E8D9B0';
+  function p(arr){return arr.map(([x,y])=>`${ox+x},${oy+y}`).join(' ');}
 
-  function pts(arr) { return arr.map(([x,y])=>`${ox+x},${oy+y}`).join(' '); }
+  const d=mission.deploy;
+  const nInch=parseFloat(d.split('-').pop());
+  const n=nInch*SC;
 
-  let z1, z2;
-  const d = mission.deploy;
-  const num = parseFloat(d.split('-').pop()) * SC;
-
-  if (d.startsWith('long-')) {
-    z1 = pts([[0,0],[W,0],[W,num],[0,num]]);
-    z2 = pts([[0,H-num],[W,H-num],[W,H],[0,H]]);
-  } else if (d.startsWith('short-')) {
-    z1 = pts([[0,0],[num,0],[num,H],[0,H]]);
-    z2 = pts([[W-num,0],[W,0],[W,H],[W-num,H]]);
-  } else if (d === 'diagonal') {
-    z1 = pts([[0,0],[W,0],[0,H]]);
-    z2 = pts([[W,0],[W,H],[0,H]]);
-  } else if (d.startsWith('diagonal-corner-')) {
-    // rectangular zones near opposite corners, angled
-    const n = num;
-    z1 = pts([[0,0],[n*1.5,0],[0,n*1.5]]);
-    z2 = pts([[W,H],[W-n*1.5,H],[W,H-n*1.5]]);
+  let z1,z2;
+  if(d.startsWith('long-')){
+    // zones along top and bottom (60" edges)
+    z1=p([[0,0],[W,0],[W,n],[0,n]]);
+    z2=p([[0,H-n],[W,H-n],[W,H],[0,H]]);
+  } else if(d.startsWith('short-')){
+    // zones along left and right (44" edges)
+    z1=p([[0,0],[n,0],[n,H],[0,H]]);
+    z2=p([[W-n,0],[W,0],[W,H],[W-n,H]]);
+  } else if(d==='diagonal'){
+    // diagonal from top-right to bottom-left
+    z1=p([[0,0],[W,0],[0,H]]);
+    z2=p([[W,0],[W,H],[0,H]]);
+  } else if(d.startsWith('diagonal-corner-')){
+    // triangular zones in opposite corners, legs = nInch along each edge
+    const lx=nInch/TW*W, ly=nInch/TH*H;
+    z1=p([[0,0],[lx,0],[0,ly]]);
+    z2=p([[W,H],[W-lx,H],[W,H-ly]]);
   }
 
-  // dimension arrows helper
-  function dimH(x1,x2,y,label) {
-    return <g key={`dh${x1}${y}`}>
-      <line x1={ox+x1} y1={oy+y} x2={ox+x2} y2={oy+y} stroke={CS} strokeWidth="1" markerEnd="url(#arr)" markerStart="url(#arr)"/>
-      <text x={ox+(x1+x2)/2} y={oy+y-4} textAnchor="middle" fill={TXT} fontSize="9" fontFamily="Cinzel,serif">{label}</text>
+  // ── dimension helpers ──
+  const arrId='arr'+mission.id;
+  function dimH(x1,x2,y,label,above=true){
+    const ty=above?oy+y-5:oy+y+11;
+    return <g key={`h${x1}${y}`}>
+      <line x1={ox+x1} y1={oy+y} x2={ox+x2} y2={oy+y}
+        stroke={CS} strokeWidth="1"
+        markerStart={`url(#${arrId})`} markerEnd={`url(#${arrId})`}/>
+      <text x={ox+(x1+x2)/2} y={ty} textAnchor="middle" fill={TXT} fontSize="9" fontFamily="Arial,sans-serif">{label}</text>
     </g>;
   }
-  function dimV(x,y1,y2,label) {
-    return <g key={`dv${x}${y1}`}>
-      <line x1={ox+x} y1={oy+y1} x2={ox+x} y2={oy+y2} stroke={CS} strokeWidth="1" markerEnd="url(#arr)" markerStart="url(#arr)"/>
-      <text x={ox+x-4} y={oy+(y1+y2)/2} textAnchor="middle" fill={TXT} fontSize="9" fontFamily="Cinzel,serif" transform={`rotate(-90,${ox+x-4},${oy+(y1+y2)/2})`}>{label}</text>
+  function dimV(x,y1,y2,label,left=true){
+    const mx=left?ox+x-5:ox+x+12;
+    return <g key={`v${x}${y1}`}>
+      <line x1={ox+x} y1={oy+y1} x2={ox+x} y2={oy+y2}
+        stroke={CS} strokeWidth="1"
+        markerStart={`url(#${arrId})`} markerEnd={`url(#${arrId})`}/>
+      <text x={mx} y={oy+(y1+y2)/2+4} textAnchor="middle" fill={TXT} fontSize="9" fontFamily="Arial,sans-serif"
+        transform={`rotate(-90,${mx},${oy+(y1+y2)/2+4})`}>{label}</text>
     </g>;
   }
 
-  // deployment depth labels
-  let dims = [];
-  if (d.startsWith('long-')) {
-    const n = parseFloat(d.split('-')[1]);
-    dims = [dimV(-16, 0, num*SC/SC*SC, `${n}"`), dimV(-16, H-num*SC/SC*SC, H, `${n}"`)];
-    dims = [
-      dimV(-16, 0, num, `${n}"`),
-      dimV(-16, H-num, H, `${n}"`),
-      dimH(0, W, -16, `${TW}"`),
-      dimV(W+16, 0, H, `${TH}"`),
+  // ── build dimension labels ──
+  let dims=[];
+  if(d.startsWith('long-')){
+    dims=[
+      dimH(0,W,-18,`${TW}"`),
+      dimV(W+16,0,H,`${TH}"`),
+      dimV(-16,0,n,`${nInch}"`),
+      dimV(-16,H-n,H,`${nInch}"`),
+      dimH(0,W,n,`no man's land ${TH-nInch*2}"`,false),
     ];
-  } else if (d.startsWith('short-')) {
-    const n = parseFloat(d.split('-')[1]);
-    dims = [
-      dimH(0, num, -16, `${n}"`),
-      dimH(W-num, W, -16, `${n}"`),
-      dimH(0, W, H+16, `${TW}"`),
-      dimV(W+16, 0, H, `${TH}"`),
+  } else if(d.startsWith('short-')){
+    dims=[
+      dimH(0,W,-18,`${TW}"`),
+      dimV(W+16,0,H,`${TH}"`),
+      dimH(0,n,H+16,`${nInch}"`),
+      dimH(W-n,W,H+16,`${nInch}"`),
+      dimV(n+2,0,H,`no man's land ${TW-nInch*2}"`,false),
     ];
+  } else if(d==='diagonal'){
+    dims=[dimH(0,W,-18,`${TW}"`),dimV(W+16,0,H,`${TH}"`)];
   } else {
-    dims = [
-      dimH(0, W, -16, `${TW}"`),
-      dimV(W+16, 0, H, `${TH}"`),
+    const lx=nInch/TW*W, ly=nInch/TH*H;
+    dims=[
+      dimH(0,W,-18,`${TW}"`),
+      dimV(W+16,0,H,`${TH}"`),
+      dimH(0,lx,H+16,`${nInch}"`),
+      dimV(-16,0,ly,`${nInch}"`),
     ];
   }
 
-  // objective markers
-  const objs = (mission.objectives||[]).map((o,i)=>{
-    const cx = ox + o.x * W, cy = oy + o.y * H;
+  // ── objective markers ──
+  const objs=(mission.objectives||[]).map((o,i)=>{
+    const cx=ox+o.x*W, cy=oy+o.y*H;
     return <g key={i}>
-      <circle cx={cx} cy={cy} r={7} fill="rgba(201,168,76,.18)" stroke={CS} strokeWidth="1.5"/>
-      <text x={cx} y={cy+4} textAnchor="middle" fill={CS} fontSize="9" fontFamily="Cinzel,serif" fontWeight="bold">{i+1}</text>
+      <circle cx={cx} cy={cy} r={8} fill="rgba(201,168,76,.15)" stroke={CS} strokeWidth="1.5"/>
+      <text x={cx} y={cy+4} textAnchor="middle" fill={CS} fontSize="9" fontFamily="Arial,sans-serif" fontWeight="bold">{i+1}</text>
     </g>;
   });
 
   return <svg viewBox={`0 0 ${VW} ${VH}`} style={{width:'100%',display:'block',...style}}>
     <defs>
-      <marker id="arr" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
-        <path d="M0,0 L6,3 L0,6 Z" fill={CS}/>
+      <marker id={arrId} markerWidth="5" markerHeight="5" refX="2.5" refY="2.5" orient="auto">
+        <polygon points="0,0 5,2.5 0,5" fill={CS}/>
       </marker>
     </defs>
-    {/* table bg */}
-    <rect x={ox} y={oy} width={W} height={H} fill="rgba(20,16,10,.9)" stroke={CS} strokeWidth="1.5"/>
-    {/* center line */}
-    <line x1={ox} y1={oy+H/2} x2={ox+W} y2={oy+H/2} stroke="rgba(201,168,76,.2)" strokeWidth="1" strokeDasharray="4,4"/>
-    <line x1={ox+W/2} y1={oy} x2={ox+W/2} y2={oy+H} stroke="rgba(201,168,76,.2)" strokeWidth="1" strokeDasharray="4,4"/>
-    {/* zones */}
-    {z1&&<polygon points={z1} fill={C1} stroke="rgba(255,80,80,.6)" strokeWidth="1.5"/>}
-    {z2&&<polygon points={z2} fill={C2} stroke="rgba(80,120,255,.6)" strokeWidth="1.5"/>}
+    {/* table */}
+    <rect x={ox} y={oy} width={W} height={H} fill="rgba(18,14,9,.95)" stroke={CS} strokeWidth="1.5" rx="2"/>
+    {/* centre lines */}
+    <line x1={ox} y1={oy+H/2} x2={ox+W} y2={oy+H/2} stroke="rgba(201,168,76,.18)" strokeWidth="1" strokeDasharray="5,5"/>
+    <line x1={ox+W/2} y1={oy} x2={ox+W/2} y2={oy+H} stroke="rgba(201,168,76,.18)" strokeWidth="1" strokeDasharray="5,5"/>
+    {/* deployment zones */}
+    {z1&&<polygon points={z1} fill={C1} stroke="rgba(220,60,60,.7)" strokeWidth="1.5"/>}
+    {z2&&<polygon points={z2} fill={C2} stroke="rgba(60,100,220,.7)" strokeWidth="1.5"/>}
     {/* objectives */}
     {objs}
-    {/* dimension lines */}
+    {/* dimensions */}
     {dims}
-    {/* corner labels */}
-    <text x={ox+4} y={oy+14} fill="rgba(255,120,120,.9)" fontSize="9" fontFamily="Cinzel,serif">P1</text>
-    <text x={ox+W-4} y={oy+H-6} fill="rgba(120,160,255,.9)" fontSize="9" fontFamily="Cinzel,serif" textAnchor="end">P2</text>
+    {/* player labels inside zones */}
+    <text x={ox+14} y={oy+14} fill="rgba(255,150,150,.95)" fontSize="10" fontFamily="Arial,sans-serif" fontWeight="bold">P1</text>
+    <text x={ox+W-14} y={oy+H-6} fill="rgba(130,170,255,.95)" fontSize="10" fontFamily="Arial,sans-serif" fontWeight="bold" textAnchor="end">P2</text>
   </svg>;
+}
+
+// ═══════════════════════════════════
+//  ROUND MISSION MODAL
+// ═══════════════════════════════════
+function RoundMissionModal({roundNum, game, currentId, onSave, onClose}) {
+  const missions = game==='40k' ? MISSIONS_40K : MISSIONS_AOS;
+  const [sel, setSel] = useState(currentId||1);
+  const mission = missions.find(m=>m.id===sel)||missions[0];
+  return <div style={S.overlay} onClick={onClose}>
+    <div style={{...S.modalBox,maxWidth:440}} onClick={e=>e.stopPropagation()}>
+      <div style={{fontFamily:'Cinzel,serif',color:'var(--gold)',fontSize:14,marginBottom:4,letterSpacing:'.08em'}}>
+        🗺 Round {roundNum} — Mission
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:5,marginBottom:10}}>
+        {missions.map(m=>(
+          <div key={m.id} onClick={()=>setSel(m.id)}
+            style={{display:'flex',gap:10,padding:'8px 10px',cursor:'pointer',borderRadius:3,
+              border:`1px solid ${sel===m.id?'var(--gold)':'rgba(201,168,76,.18)'}`,
+              background:sel===m.id?'rgba(201,168,76,.07)':'var(--d3)',alignItems:'center'}}>
+            <div style={{width:12,height:12,borderRadius:'50%',flexShrink:0,
+              border:`2px solid ${sel===m.id?'var(--gold)':'var(--steel)'}`,
+              display:'flex',alignItems:'center',justifyContent:'center'}}>
+              {sel===m.id&&<div style={{width:6,height:6,borderRadius:'50%',background:'var(--gold)'}}/>}
+            </div>
+            <div>
+              <div style={{fontFamily:'Cinzel,serif',fontSize:11,color:'var(--gold)'}}>{m.id}. {m.name}</div>
+              <div style={{fontSize:11,color:'var(--steel)'}}>{m.deploy}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <DeployMapSVG mission={mission} style={{borderRadius:3,border:'1px solid rgba(201,168,76,.2)',marginBottom:12}}/>
+      <div style={{display:'flex',gap:8}}>
+        <button style={{...S.btn('red'),marginBottom:0,flex:1}} onClick={()=>onSave(sel)}>✓ Save</button>
+        <button style={{...S.btn('danger'),marginBottom:0,flex:1}} onClick={onClose}>Cancel</button>
+      </div>
+    </div>
+  </div>;
+}
+
+// ═══════════════════════════════════
+//  SETTINGS MODAL
+// ═══════════════════════════════════
+function SettingsModal({config, setConfig, lightMode, setLightMode, onClose, onReset, setConfirm}) {
+  const [editingRound,   setEditingRound]   = useState(null);
+  const [editingMission, setEditingMission] = useState(null);
+
+  function changeRounds(n) {
+    setConfig(c=>{
+      const rs=(c.roundScenarios||[]),rm=(c.roundMissions||[]);
+      const newRs=[],newRm=[];
+      for(let i=0;i<n;i++){
+        newRs.push(rs[i]||{scenario:1,secObjs:{},scenarioName:'Upon the Field of Glory'});
+        newRm.push(rm[i]||1);
+      }
+      return {...c,rounds:n,roundScenarios:newRs,roundMissions:newRm};
+    });
+  }
+
+  const isTow = config.game==='tow';
+  const isMission = config.game==='40k'||config.game==='aos';
+
+  return <>
+    {/* Sub-modals — rendered after settings overlay, appear on top */}
+    {editingRound&&<RoundScenarioModal
+      roundNum={editingRound}
+      initial={(config.roundScenarios||[])[editingRound-1]}
+      onSave={d=>{setConfig(c=>({...c,roundScenarios:c.roundScenarios.map((r,i)=>i===editingRound-1?d:r)}));setEditingRound(null);}}
+      onClose={()=>setEditingRound(null)}/>}
+    {editingMission&&<RoundMissionModal
+      roundNum={editingMission}
+      game={config.game}
+      currentId={(config.roundMissions||[])[editingMission-1]}
+      onSave={mId=>{setConfig(c=>({...c,roundMissions:c.roundMissions.map((v,i)=>i===editingMission-1?mId:v)}));setEditingMission(null);}}
+      onClose={()=>setEditingMission(null)}/>}
+
+    <div style={S.overlay} onClick={onClose}>
+      <div style={{...S.modalBox,maxWidth:460}} onClick={e=>e.stopPropagation()}>
+
+        <div style={{fontFamily:'Cinzel,serif',color:'var(--gold)',fontSize:14,marginBottom:14,letterSpacing:'.08em'}}>⚙ Asetukset</div>
+
+        {/* Rounds & Tables */}
+        <div style={{display:'flex',gap:10,marginBottom:14}}>
+          <div style={{flex:1}}>
+            <label style={S.label}>Kierrokset</label>
+            <select style={{...S.select,marginBottom:0}} value={config.rounds} onChange={e=>changeRounds(+e.target.value)}>
+              {[3,4,5,6,7,8].map(n=><option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <div style={{flex:1}}>
+            <label style={S.label}>Pöytien määrä</label>
+            <input style={{...S.input,marginBottom:0}} type="number" min="1" max="60" value={config.tables}
+              onChange={e=>setConfig(c=>({...c,tables:+e.target.value||1}))}/>
+          </div>
+        </div>
+
+        {/* TOW: per-round scenarios */}
+        {isTow&&(config.roundScenarios||[]).length>0&&<>
+          <div style={{fontFamily:'Cinzel,serif',fontSize:10,color:'var(--gold)',letterSpacing:'.08em',
+            textTransform:'uppercase',marginBottom:8}}>🗺 Skenaariot per kierros</div>
+          <div style={{display:'flex',flexDirection:'column',gap:5,marginBottom:14}}>
+            {(config.roundScenarios||[]).map((rs,i)=>{
+              const sc=SCENARIOS.find(s=>s.id===rs.scenario);
+              const secList=Object.entries(rs.secObjs||{}).filter(([,v])=>v).map(([k])=>SEC_OBJ[k]?.name).filter(Boolean);
+              const reqList=(sc?.secRequired||[]).map(k=>SEC_OBJ[k]?.name).filter(Boolean);
+              const allSec=[...new Set([...reqList,...secList])];
+              return <div key={i} style={{display:'flex',gap:8,alignItems:'center',padding:'8px 10px',
+                background:'var(--d3)',border:'1px solid rgba(201,168,76,.18)',borderRadius:3}}>
+                <div style={{width:44,flexShrink:0,borderRadius:2,overflow:'hidden'}}>
+                  <ScenarioMap id={sc?.id}/>
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontFamily:'Cinzel,serif',fontSize:10,color:'var(--gold)',letterSpacing:'.05em',marginBottom:1}}>
+                    Round {i+1} · {sc?.name}
+                  </div>
+                  <div style={{fontSize:10,color:'var(--steel)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                    {allSec.length?allSec.join(' · '):'Ei sivutehtäviä'}
+                  </div>
+                </div>
+                <button style={{...S.btn('outline',true),fontSize:10}} onClick={()=>setEditingRound(i+1)}>Edit</button>
+              </div>;
+            })}
+          </div>
+        </>}
+
+        {/* 40k/AoS: per-round missions */}
+        {isMission&&(config.roundMissions||[]).length>0&&<>
+          <div style={{fontFamily:'Cinzel,serif',fontSize:10,color:'var(--gold)',letterSpacing:'.08em',
+            textTransform:'uppercase',marginBottom:8}}>🗺 Missiot per kierros</div>
+          <div style={{display:'flex',flexDirection:'column',gap:5,marginBottom:14}}>
+            {(config.roundMissions||[]).map((mId,i)=>{
+              const missions=config.game==='40k'?MISSIONS_40K:MISSIONS_AOS;
+              const m=missions.find(x=>x.id===mId)||missions[0];
+              return <div key={i} style={{display:'flex',gap:8,alignItems:'center',padding:'8px 10px',
+                background:'var(--d3)',border:'1px solid rgba(201,168,76,.18)',borderRadius:3}}>
+                <div style={{width:44,flexShrink:0,borderRadius:2,overflow:'hidden',border:'1px solid rgba(201,168,76,.15)'}}>
+                  <DeployMapSVG mission={m} style={{display:'block'}}/>
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontFamily:'Cinzel,serif',fontSize:10,color:'var(--gold)',letterSpacing:'.05em',marginBottom:1}}>
+                    Round {i+1} · {m.name}
+                  </div>
+                  <div style={{fontSize:10,color:'var(--steel)'}}>{m.deploy}</div>
+                </div>
+                <button style={{...S.btn('outline',true),fontSize:10}} onClick={()=>setEditingMission(i+1)}>Edit</button>
+              </div>;
+            })}
+          </div>
+        </>}
+
+        {/* Dark / Light mode */}
+        <div style={{fontFamily:'Cinzel,serif',fontSize:10,color:'var(--gold)',letterSpacing:'.08em',
+          textTransform:'uppercase',marginBottom:8}}>Teema</div>
+        <div style={{display:'flex',gap:8,marginBottom:16}}>
+          {[{k:false,label:'🌙 Dark'},{k:true,label:'☀ Light'}].map(opt=>(
+            <button key={String(opt.k)} onClick={()=>setLightMode(opt.k)}
+              style={{...S.btn('outline',true),flex:1,marginBottom:0,
+                border:lightMode===opt.k?'1px solid var(--gold)':'1px solid rgba(201,168,76,.2)',
+                color:lightMode===opt.k?'var(--gold)':'var(--steel)',
+                background:lightMode===opt.k?'rgba(201,168,76,.08)':'transparent'}}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <button style={{...S.btn('outline'),marginBottom:8}} onClick={onClose}>✓ Sulje</button>
+        <button style={{...S.btn('danger'),marginBottom:0}} onClick={()=>{onClose();setConfirm({
+          title:'End Tournament',
+          body:'Palaa aloitusruutuun? Kaikki tiedot poistetaan.',
+          onOk:()=>{localStorage.removeItem('wh_tourney_v4');setConfirm(null);onReset();}
+        });}}>↺ Lopeta &amp; Nollaa</button>
+
+      </div>
+    </div>
+  </>;
 }
 
 // ═══════════════════════════════════
 //  EXPORT MODAL
 // ═══════════════════════════════════
-function ExportModal({onClose, standings, matches, config, players}) {
+function ExportModal({onClose, onExport, standings, matches, config, players}) {
   function exportCSV() {
     const lines = [
       ['Sija','Pelaaja','BP','VP','V','T','H','SOS'].join(','),
@@ -931,6 +1184,7 @@ function ExportModal({onClose, standings, matches, config, players}) {
     a.download=`${config.name.replace(/\s+/g,'-')}-tulokset.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
+    onExport&&onExport('CSV viety!');
   }
 
   function exportPDF() {
@@ -970,6 +1224,7 @@ function ExportModal({onClose, standings, matches, config, players}) {
       </body></html>`);
     w.document.close();
     setTimeout(()=>w.print(),400);
+    onExport&&onExport('PDF avattu!');
   }
 
   return <div style={S.overlay}><div style={{...S.modalBox,maxWidth:320}}>
@@ -1006,11 +1261,18 @@ function TournamentApp({initConfig, tourneyId, onReset}) {
   const [config,  setConfig]  = useState(loadedState?.config   || initConfig);
   const [toast,   setToast]   = useState(null);
   const [confirm, setConfirm] = useState(null);
-  const [showBP,     setShowBP]     = useState(false);
-  const [showQR,     setShowQR]     = useState(false);
-  const [showExport, setShowExport] = useState(false);
-  const [showSave,   setShowSave]   = useState(false);
+  const [showBP,       setShowBP]       = useState(false);
+  const [showQR,       setShowQR]       = useState(false);
+  const [showExport,   setShowExport]   = useState(false);
+  const [showSave,     setShowSave]     = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [lightMode,    setLightMode]    = useState(()=>localStorage.getItem('wh_theme')==='light');
   const [newName, setNewName] = useState('');
+
+  useEffect(()=>{
+    document.documentElement.classList.toggle('light', lightMode);
+    localStorage.setItem('wh_theme', lightMode?'light':'dark');
+  },[lightMode]);
   const toastRef    = useRef();
   const firstRender = useRef(true);
 
@@ -1070,16 +1332,17 @@ function TournamentApp({initConfig, tourneyId, onReset}) {
   const standings = calcStandings(players,matches,config.bpTable);
   const viewerURL = `${window.location.origin}${window.location.pathname}?t=${tourneyId}`;
   const adminURL  = `${window.location.origin}${window.location.pathname}?admin=${tourneyId}`;
-  const tabs=[{k:'players',label:'Players'},{k:'round',label:'Round'},{k:'settings',label:'Settings'}];
+  const tabs=[{k:'players',label:'Players'},{k:'round',label:'Round'}];
 
   return (
     <div style={S.screen}>
       {toast   &&<Toast msg={toast.msg} err={toast.err}/>}
       {confirm &&<ConfirmModal {...confirm} onClose={()=>setConfirm(null)}/>}
       {showBP  &&<BPModal table={config.bpTable} onSave={t=>{setConfig(c=>({...c,bpTable:t}));setShowBP(false);showToast('BP table saved!');}} onClose={()=>setShowBP(false)}/>}
-      {showQR     &&<QRModal url={viewerURL} onClose={()=>setShowQR(false)}/>}
-      {showExport &&<ExportModal onClose={()=>setShowExport(false)} standings={standings} matches={matches} config={config} players={players}/>}
-      {showSave   &&<SaveModal adminUrl={adminURL} onClose={()=>setShowSave(false)}/>}
+      {showQR       &&<QRModal url={viewerURL} onClose={()=>setShowQR(false)} onCopy={()=>showToast('Linkki kopioitu!')}/>}
+      {showExport   &&<ExportModal onClose={()=>setShowExport(false)} onExport={msg=>{setShowExport(false);showToast(msg);}} standings={standings} matches={matches} config={config} players={players}/>}
+      {showSave     &&<SaveModal adminUrl={adminURL} onClose={()=>setShowSave(false)} onCopy={()=>showToast('Admin-linkki kopioitu!')}/>}
+      {showSettings &&<SettingsModal config={config} setConfig={setConfig} lightMode={lightMode} setLightMode={setLightMode} onClose={()=>setShowSettings(false)} onReset={onReset} setConfirm={setConfirm}/>}
 
       <div style={S.hdr}>
         <div style={S.h1}>{config.name}</div>
@@ -1091,6 +1354,7 @@ function TournamentApp({initConfig, tourneyId, onReset}) {
             {icon:'📡',label:'Live',fn:()=>setShowQR(true)},
             {icon:'💾',label:'Save',fn:()=>setShowSave(true)},
             {icon:'📤',label:'Export',fn:()=>setShowExport(true)},
+            {icon:'⚙',label:'Settings',fn:()=>setShowSettings(true)},
           ].map(b=>(
             <button key={b.label} onClick={b.fn}
               style={{background:'none',border:'1px solid rgba(201,168,76,.3)',borderRadius:3,
@@ -1160,7 +1424,8 @@ function TournamentApp({initConfig, tourneyId, onReset}) {
             {config.game==='tow'&&<RoundScenariosPanel config={config} curRd={curRd}/>}
             {(config.game==='40k'||config.game==='aos')&&(()=>{
               const missions = config.game==='40k' ? MISSIONS_40K : MISSIONS_AOS;
-              const m = missions.find(x=>x.id===config.missionId)||missions[0];
+              const mId = (config.roundMissions||[])[curRd.round-1] || 1;
+              const m = missions.find(x=>x.id===mId)||missions[0];
               return <div style={{marginBottom:12}}>
                 <div style={{fontFamily:'Cinzel,serif',fontSize:11,color:'var(--gold)',
                   letterSpacing:'.06em',marginBottom:6,textAlign:'center'}}>
@@ -1185,125 +1450,71 @@ function TournamentApp({initConfig, tourneyId, onReset}) {
               return(
                 <div key={i} style={S.pairCard}><div style={{padding:'10px 12px'}}>
                   <div style={{fontFamily:'Cinzel,serif',fontSize:10,color:'var(--steel)',letterSpacing:'.12em',textTransform:'uppercase',textAlign:'center',marginBottom:8}}>Table {p.table}</div>
-                  <div style={{display:'grid',gridTemplateColumns:config.scoring==='tow'?'1fr 28px 1fr':'1fr',gap:4,alignItems:'start'}}>
-                    {config.scoring==='tow' ? <>
-                      <div style={{display:'flex',flexDirection:'column',gap:4}}>
-                        <div style={{fontWeight:600,fontSize:14,lineHeight:1.2}}>{pl1?.name}</div>
-                        <div style={{fontSize:11,color:'var(--steel)'}}>{getPlayerBP(p.p1,matches,config.bpTable)}BP total</div>
-                        <input style={S.scoreInput} type="number" min="0" max="999999" placeholder="VP"
-                          value={p.vp1??''} onChange={e=>setScore(curRd.round,i,'vp1',e.target.value)}/>
-                        {hasBoth&&<div style={S.resBadge(calc.bp1)}>{wdl(calc.bp1)} · {calc.bp1}BP</div>}
-                      </div>
-                      <div style={{display:'flex',flexDirection:'column',alignItems:'center',paddingTop:2,gap:4}}>
-                        <div style={{fontFamily:'Cinzel,serif',fontSize:11,color:'var(--blood)',fontWeight:700}}>VS</div>
-                        {hasBoth&&<div style={{fontFamily:'Cinzel,serif',fontSize:10,color:'var(--steel)',textAlign:'center',lineHeight:1.4,marginTop:6}}>
-                          <span style={{color:'var(--gold)',fontSize:13,display:'block'}}>{calc.bp1}</span>
-                          <span style={{fontSize:9}}>BP</span>
-                          <span style={{color:'var(--steel)',fontSize:11,display:'block'}}>–</span>
-                          <span style={{color:'var(--gold)',fontSize:13,display:'block'}}>{calc.bp2}</span>
-                          <span style={{fontSize:9}}>BP</span>
-                        </div>}
-                      </div>
-                      <div style={{display:'flex',flexDirection:'column',gap:4,alignItems:'flex-end'}}>
-                        <div style={{fontWeight:600,fontSize:14,lineHeight:1.2,textAlign:'right'}}>{pl2?.name}</div>
-                        <div style={{fontSize:11,color:'var(--steel)'}}>{getPlayerBP(p.p2,matches,config.bpTable)}BP total</div>
-                        <input style={S.scoreInput} type="number" min="0" max="999999" placeholder="VP"
-                          value={p.vp2??''} onChange={e=>setScore(curRd.round,i,'vp2',e.target.value)}/>
-                        {hasBoth&&<div style={{...S.resBadge(calc.bp2)}}>{wdl(calc.bp2)} · {calc.bp2}BP</div>}
-                      </div>
-                    </> : config.scoring==='aos' ? <>
-                      <div style={{gridColumn:'1/-1',display:'flex',flexDirection:'column',gap:8}}>
-                        <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:4}}>
-                          <div><div style={{fontWeight:600,fontSize:14}}>{pl1?.name}</div>
-                            <div style={{fontSize:11,color:'var(--steel)'}}>{getPlayerBP(p.p1,matches,config.bpTable)}BP total</div></div>
-                          <div style={{fontFamily:'Cinzel,serif',fontSize:11,color:'var(--blood)',fontWeight:700,alignSelf:'center',padding:'0 4px'}}>VS</div>
-                          <div style={{textAlign:'right'}}><div style={{fontWeight:600,fontSize:14}}>{pl2?.name}</div>
-                            <div style={{fontSize:11,color:'var(--steel)'}}>{getPlayerBP(p.p2,matches,config.bpTable)}BP total</div></div>
-                        </div>
-                        {!hasBoth ? <>
-                          {[
-                            {label:`⚔ Major Win — ${pl1?.name}`,v1:10,v2:0},
-                            {label:`Minor Win — ${pl1?.name}`,v1:3,v2:0},
-                            {label:'Draw',v1:0,v2:0},
-                            {label:`Minor Win — ${pl2?.name}`,v1:0,v2:3},
-                            {label:`⚔ Major Win — ${pl2?.name}`,v1:0,v2:10},
-                          ].map(opt=>{
-                            const sel=p.vp1===opt.v1&&p.vp2===opt.v2;
-                            const isDraw=opt.v1===0&&opt.v2===0;
-                            const isMaj=opt.v1===10||opt.v2===10;
-                            return <button key={opt.label}
-                              style={{...S.btn('outline'),marginBottom:0,padding:'9px 12px',
-                                border:sel?`1px solid ${isDraw?'var(--draw)':'var(--win)'}`:'1px solid rgba(201,168,76,.25)',
-                                color:sel?(isDraw?'var(--draw)':'var(--win)'):'var(--steel)',
-                                background:sel?(isDraw?'rgba(100,80,0,.2)':'rgba(0,100,0,.2)'):'transparent',
-                                fontWeight:isMaj?600:400}}
-                              onClick={()=>{setScore(curRd.round,i,'vp1',opt.v1);setScore(curRd.round,i,'vp2',opt.v2);}}>
-                              {opt.label}
-                            </button>;
-                          })}
-                        </> : <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0'}}>
-                          <div style={S.resBadge(calc.bp1)}>{wdl(calc.bp1)} · {calc.bp1}BP</div>
-                          <div style={{fontFamily:'Cinzel,serif',fontSize:13,color:'var(--gold)'}}>{calc.bp1}–{calc.bp2}</div>
-                          <div style={S.resBadge(calc.bp2)}>{wdl(calc.bp2)} · {calc.bp2}BP</div>
-                        </div>}
-                        {hasBoth&&<button style={{...S.btn('outline',true),fontSize:10,color:'var(--steel)'}}
-                          onClick={()=>{setScore(curRd.round,i,'vp1',null);setScore(curRd.round,i,'vp2',null);}}>
-                          ✕ Clear result
-                        </button>}
-                      </div>
-                    </> : <>
-                      <div style={{gridColumn:'1/-1',display:'flex',flexDirection:'column',gap:8}}>
-                        <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:4}}>
-                          <div>
-                            <div style={{fontWeight:600,fontSize:14}}>{pl1?.name}</div>
-                            <div style={{fontSize:11,color:'var(--steel)'}}>{getPlayerBP(p.p1,matches,config.bpTable)}BP total</div>
-                          </div>
-                          <div style={{fontFamily:'Cinzel,serif',fontSize:11,color:'var(--blood)',fontWeight:700,alignSelf:'center',padding:'0 4px'}}>VS</div>
-                          <div style={{textAlign:'right'}}>
-                            <div style={{fontWeight:600,fontSize:14}}>{pl2?.name}</div>
-                            <div style={{fontSize:11,color:'var(--steel)'}}>{getPlayerBP(p.p2,matches,config.bpTable)}BP total</div>
-                          </div>
-                        </div>
-                        {!hasBoth
-                          ? <div style={{display:'flex',flexDirection:'column',gap:6}}>
-                              <button
-                                style={{...S.btn('outline'),marginBottom:0,padding:'10px 12px',
-                                  border:p.vp1===2000&&p.vp2===0?'1px solid var(--win)':'1px solid rgba(201,168,76,.25)',
-                                  color:p.vp1===2000&&p.vp2===0?'var(--win)':'var(--steel)',
-                                  background:p.vp1===2000&&p.vp2===0?'rgba(0,100,0,.2)':'transparent'}}
-                                onClick={()=>{setScore(curRd.round,i,'vp1',2000);setScore(curRd.round,i,'vp2',0);}}>
-                                <span style={{fontWeight:600}}>{pl1?.name}</span>&nbsp; wins
-                              </button>
-                              <button
-                                style={{...S.btn('outline'),marginBottom:0,padding:'10px 12px',
-                                  border:p.vp1===1000&&p.vp2===1000?'1px solid var(--draw)':'1px solid rgba(201,168,76,.25)',
-                                  color:p.vp1===1000&&p.vp2===1000?'var(--draw)':'var(--steel)',
-                                  background:p.vp1===1000&&p.vp2===1000?'rgba(100,80,0,.2)':'transparent'}}
-                                onClick={()=>{setScore(curRd.round,i,'vp1',1000);setScore(curRd.round,i,'vp2',1000);}}>
-                                Draw
-                              </button>
-                              <button
-                                style={{...S.btn('outline'),marginBottom:0,padding:'10px 12px',
-                                  border:p.vp1===0&&p.vp2===2000?'1px solid var(--win)':'1px solid rgba(201,168,76,.25)',
-                                  color:p.vp1===0&&p.vp2===2000?'var(--win)':'var(--steel)',
-                                  background:p.vp1===0&&p.vp2===2000?'rgba(0,100,0,.2)':'transparent'}}
-                                onClick={()=>{setScore(curRd.round,i,'vp1',0);setScore(curRd.round,i,'vp2',2000);}}>
-                                <span style={{fontWeight:600}}>{pl2?.name}</span>&nbsp; wins
-                              </button>
-                            </div>
-                          : <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0'}}>
-                              <div style={S.resBadge(calc.bp1)}>{wdl(calc.bp1)} · {calc.bp1}BP</div>
-                              <div style={{fontFamily:'Cinzel,serif',fontSize:13,color:'var(--gold)'}}>{calc.bp1}–{calc.bp2}</div>
-                              <div style={S.resBadge(calc.bp2)}>{wdl(calc.bp2)} · {calc.bp2}BP</div>
-                            </div>
-                        }
-                        {hasBoth&&<button style={{...S.btn('outline',true),fontSize:10,color:'var(--steel)'}}
-                          onClick={()=>{setScore(curRd.round,i,'vp1',null);setScore(curRd.round,i,'vp2',null);}}>
-                          ✕ Clear result
-                        </button>}
-                      </div>
-                    </>}
+                  {/* ── Unified VP entry (same style for all scoring modes) ── */}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 28px 1fr',gap:4,alignItems:'start'}}>
+                    <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                      <div style={{fontWeight:600,fontSize:14,lineHeight:1.2}}>{pl1?.name}</div>
+                      <div style={{fontSize:11,color:'var(--steel)'}}>{getPlayerBP(p.p1,matches,config.bpTable)}BP total</div>
+                      <input style={S.scoreInput} type="number" min="0" max="999999" placeholder="VP"
+                        value={p.vp1??''} onChange={e=>setScore(curRd.round,i,'vp1',e.target.value)}/>
+                      {hasBoth&&<div style={S.resBadge(calc.bp1)}>{wdl(calc.bp1)} · {calc.bp1}BP</div>}
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',alignItems:'center',paddingTop:2,gap:4}}>
+                      <div style={{fontFamily:'Cinzel,serif',fontSize:11,color:'var(--blood)',fontWeight:700}}>VS</div>
+                      {hasBoth&&<div style={{fontFamily:'Cinzel,serif',fontSize:10,color:'var(--steel)',textAlign:'center',lineHeight:1.4,marginTop:6}}>
+                        <span style={{color:'var(--gold)',fontSize:13,display:'block'}}>{calc.bp1}</span>
+                        <span style={{fontSize:9}}>BP</span>
+                        <span style={{color:'var(--steel)',fontSize:11,display:'block'}}>–</span>
+                        <span style={{color:'var(--gold)',fontSize:13,display:'block'}}>{calc.bp2}</span>
+                        <span style={{fontSize:9}}>BP</span>
+                      </div>}
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',gap:4,alignItems:'flex-end'}}>
+                      <div style={{fontWeight:600,fontSize:14,lineHeight:1.2,textAlign:'right'}}>{pl2?.name}</div>
+                      <div style={{fontSize:11,color:'var(--steel)'}}>{getPlayerBP(p.p2,matches,config.bpTable)}BP total</div>
+                      <input style={S.scoreInput} type="number" min="0" max="999999" placeholder="VP"
+                        value={p.vp2??''} onChange={e=>setScore(curRd.round,i,'vp2',e.target.value)}/>
+                      {hasBoth&&<div style={{...S.resBadge(calc.bp2)}}>{wdl(calc.bp2)} · {calc.bp2}BP</div>}
+                    </div>
                   </div>
+                  {/* ── AoS quick-pick shortcuts ── */}
+                  {config.scoring==='aos'&&!hasBoth&&<div style={{marginTop:8,display:'flex',flexDirection:'column',gap:4}}>
+                    <div style={{fontSize:9,color:'var(--steel)',textAlign:'center',letterSpacing:'.08em',fontFamily:'Cinzel,serif',marginBottom:2}}>QUICK RESULT</div>
+                    {[
+                      {label:`⚔ Major Win — ${pl1?.name}`, v1:5, v2:0, col:'var(--win)'},
+                      {label:`Minor Win — ${pl1?.name}`,    v1:1, v2:0, col:'var(--gold)'},
+                      {label:'Draw',                         v1:0, v2:0, col:'var(--draw)'},
+                      {label:`Minor Win — ${pl2?.name}`,    v1:0, v2:1, col:'var(--gold)'},
+                      {label:`⚔ Major Win — ${pl2?.name}`, v1:0, v2:5, col:'var(--win)'},
+                    ].map(opt=>(
+                      <button key={opt.label}
+                        style={{...S.btn('outline'),marginBottom:0,padding:'7px 10px',fontSize:11,
+                          color:opt.col,borderColor:'rgba(201,168,76,.2)',textAlign:'left'}}
+                        onClick={()=>{setScore(curRd.round,i,'vp1',opt.v1);setScore(curRd.round,i,'vp2',opt.v2);}}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>}
+                  {/* ── Simple W/D/L shortcuts ── */}
+                  {config.scoring==='simple'&&!hasBoth&&<div style={{display:'flex',gap:5,marginTop:8}}>
+                    <button style={{...S.btn('outline'),flex:1,marginBottom:0,fontSize:10,color:'var(--win)',padding:'7px 4px'}}
+                      onClick={()=>{setScore(curRd.round,i,'vp1',1);setScore(curRd.round,i,'vp2',0);}}>
+                      ⚔ {pl1?.name}
+                    </button>
+                    <button style={{...S.btn('outline'),flex:'0 0 54px',marginBottom:0,fontSize:10,color:'var(--draw)',padding:'7px 4px'}}
+                      onClick={()=>{setScore(curRd.round,i,'vp1',0);setScore(curRd.round,i,'vp2',0);}}>
+                      Draw
+                    </button>
+                    <button style={{...S.btn('outline'),flex:1,marginBottom:0,fontSize:10,color:'var(--win)',padding:'7px 4px'}}
+                      onClick={()=>{setScore(curRd.round,i,'vp1',0);setScore(curRd.round,i,'vp2',1);}}>
+                      ⚔ {pl2?.name}
+                    </button>
+                  </div>}
+                  {/* ── Clear ── */}
+                  {hasBoth&&<button style={{...S.btn('outline',true),fontSize:10,color:'var(--steel)',marginTop:8}}
+                    onClick={()=>{setScore(curRd.round,i,'vp1',null);setScore(curRd.round,i,'vp2',null);}}>
+                    ✕ Clear result
+                  </button>}
                 </div></div>
               );
             })}
@@ -1334,71 +1545,6 @@ function TournamentApp({initConfig, tourneyId, onReset}) {
         </>}
 
 
-        {/* ── SETTINGS ── */}
-        {tab==='settings'&&<>
-          <Card title="⚙ Settings">
-            <label style={S.label}>Tournament Name</label>
-            <input style={S.input} value={config.name} onChange={e=>setConfig(c=>({...c,name:e.target.value}))}/>
-            <div style={{display:'flex',gap:10}}>
-              <div style={{flex:1}}><label style={S.label}>Rounds</label>
-                <select style={S.select} value={config.rounds} onChange={e=>setConfig(c=>({...c,rounds:+e.target.value}))}>
-                  {[3,4,5,6,7,8].map(n=><option key={n} value={n}>{n}</option>)}
-                </select>
-              </div>
-              <div style={{flex:1}}><label style={S.label}>Tables</label>
-                <input style={S.input} type="number" min="1" max="60" value={config.tables} onChange={e=>setConfig(c=>({...c,tables:+e.target.value||1}))}/>
-              </div>
-            </div>
-          </Card>
-          {config.scoring==='tow'&&<Card title="🎯 BP Table">
-            {(()=>{const dr=config.bpTable.find(r=>r.w===10),mx=[...config.bpTable].sort((a,b)=>b.w-a.w)[0],du=dr?(dr.hi>=99999?'∞':dr.hi):'–';return(
-              <div style={{fontSize:13,color:'var(--steel)',lineHeight:1.9,marginBottom:12}}>
-                Draw when VP diff &lt; <strong style={{color:'var(--gold)'}}>{du}</strong><br/>
-                Max win: <strong style={{color:'var(--gold)'}}>{mx.w}–{20-mx.w}</strong> BP (diff ≥ <strong style={{color:'var(--gold)'}}>{mx.lo}</strong>)
-              </div>
-            );})()}
-            <button style={S.btn('gold')} onClick={()=>setShowBP(true)}>✎ Edit BP Table</button>
-          </Card>}
-          {config.scenario&&<Card title="🗺 Scenario">
-            {(()=>{
-              const sc=SCENARIOS.find(s=>s.id===config.scenario);
-              if(!sc)return null;
-              const activeSecObjs=Object.entries(config.secObjs||{}).filter(([,v])=>v).map(([k])=>SEC_OBJ[k]).filter(Boolean);
-              return <>
-                <ScenarioMap id={sc.id} style={{borderRadius:3,marginBottom:10,opacity:.9}}/>
-                <div style={{fontFamily:'Cinzel,serif',fontSize:13,color:'var(--gold)',marginBottom:4}}>{sc.id}. {sc.name}</div>
-                <div style={{fontSize:12,color:'var(--steel)',lineHeight:1.6,marginBottom:6}}>{sc.desc}</div>
-                {sc.special!=='No special rules.'&&<div style={{fontSize:12,color:'var(--p2)',lineHeight:1.5,marginBottom:6}}>⚡ {sc.special}</div>}
-                <div style={{fontSize:11,color:'var(--steel)',marginBottom:activeSecObjs.length?8:0}}>⏱ {sc.gameLength}</div>
-                {activeSecObjs.length>0&&<>
-                  <div style={{fontFamily:'Cinzel,serif',fontSize:10,color:'var(--gold)',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:6}}>Secondary Objectives</div>
-                  {activeSecObjs.map(obj=><div key={obj.name} style={{display:'flex',gap:6,padding:'7px 8px',background:'rgba(201,168,76,.05)',border:'1px solid rgba(201,168,76,.15)',borderRadius:3,marginBottom:5,fontSize:12}}>
-                    <span style={{fontSize:16,flexShrink:0}}>{obj.icon}</span>
-                    <div><div style={{color:'var(--gold)',fontFamily:'Cinzel,serif',fontSize:11,marginBottom:2}}>{obj.name}</div>
-                    <div style={{color:'var(--steel)',fontSize:11,lineHeight:1.4}}>{obj.desc}</div></div>
-                  </div>)}
-                </>}
-              </>;
-            })()}
-          </Card>}
-          <Card title="📡 Live Standings">
-            <div style={S.msg}>Pelaajat voivat seurata sijoituksia live QR-koodin tai linkin kautta.</div>
-            <button style={S.btn('blue')} onClick={()=>setShowQR(true)}>📡 Share to players</button>
-          </Card>
-          <Card title="💾 Tallenna turnaus">
-            <div style={S.msg}>Jatka hallintaa toisella koneella tai selaimella.</div>
-            <button style={S.btn('blue')} onClick={()=>setShowSave(true)}>💾 Save Tournament Link</button>
-          </Card>
-          <Card title="📤 Vie tulokset">
-            <button style={S.btn('gold')} onClick={()=>setShowExport(true)}>📤 Export CSV / PDF</button>
-          </Card>
-          <Card title="⚠ Danger Zone">
-            <button style={S.btn('danger')} onClick={()=>setConfirm({
-              title:'End Tournament',body:'Return to start screen? All data will be cleared.',
-              onOk:()=>{localStorage.removeItem(SAVE_KEY);setConfirm(null);onReset();}
-            })}>↺ End &amp; Reset Tournament</button>
-          </Card>
-        </>}
 
       </div>
     </div>

@@ -3,7 +3,7 @@
 // ═══════════════════════════════════
 const S = {
   screen:{minHeight:'100vh',background:'var(--dark)',paddingBottom:60},
-  hdr:{background:'linear-gradient(180deg,#1A0A0A,var(--d2))',borderBottom:'2px solid var(--gold)',
+  hdr:{background:'linear-gradient(180deg,var(--dark),var(--d2))',borderBottom:'2px solid var(--gold)',
     padding:'12px 16px 10px',textAlign:'center',position:'sticky',top:0,zIndex:100,
     boxShadow:'0 4px 20px rgba(0,0,0,.8)'},
   h1:{fontFamily:'Cinzel,serif',fontSize:'clamp(15px,5vw,22px)',fontWeight:900,color:'var(--gold)',

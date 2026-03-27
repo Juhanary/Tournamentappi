@@ -6,6 +6,12 @@
   --steel:#8A8070;--text:#E8D9B8;
   --win:#88FF88;--draw:#FFD970;--loss:#FF8888;
 }
+html.light{
+  --blood:#8B0000;--gold:#7A5010;--gl:#5A3808;
+  --dark:#F0EAE0;--d2:#E6DDCF;--d3:#D9D0C0;
+  --steel:#6A5844;--text:#1E1208;
+  --win:#1A7A1A;--draw:#8A6800;--loss:#AA2222;
+}
 html,body,#root{height:100%;background:var(--dark);}
 body{font-family:'Crimson Pro',serif;font-size:16px;color:var(--text);overscroll-behavior:none;}
 button{cursor:pointer;font-family:'Crimson Pro',serif;}
