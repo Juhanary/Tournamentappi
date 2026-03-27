@@ -7,6 +7,36 @@ const DEFAULT_BP = [
   {lo:1200,hi:1500, w:16},{lo:1500,hi:1800, w:17},{lo:1800,hi:2200, w:18},
   {lo:2200,hi:99999,w:20},
 ];
+// AoS: Major Win (5+ VP diff)=20BP, Minor Win (1-4)=13BP, Draw(0)=10BP
+const DEFAULT_BP_AOS = [
+  {lo:0, hi:1,     w:10},
+  {lo:1, hi:5,     w:13},
+  {lo:5, hi:99999, w:20},
+];
+
+// ═══════════════════════════════════
+//  40K MISSIONS  (table 44"×60")
+// ═══════════════════════════════════
+// deploy types: 'long-N', 'short-N', 'diagonal', 'diagonal-corner-N'
+const MISSIONS_40K = [
+  {id:1, name:'Search and Destroy',   deploy:'diagonal',          desc:'Triangular zones – diagonal cut corner to corner.',          objectives:[{x:.5,y:.5},{x:.25,y:.25},{x:.75,y:.25},{x:.25,y:.75},{x:.75,y:.75}]},
+  {id:2, name:'Tipping Point',        deploy:'long-9',            desc:'Deployment along long table edges, 9" deep.',               objectives:[{x:.5,y:.5},{x:.2,y:.35},{x:.8,y:.35},{x:.2,y:.65},{x:.8,y:.65}]},
+  {id:3, name:'Close Engagement',     deploy:'short-9',           desc:'Deployment along short table edges, 9" deep.',              objectives:[{x:.5,y:.5},{x:.35,y:.2},{x:.35,y:.8},{x:.65,y:.2},{x:.65,y:.8}]},
+  {id:4, name:'Hammer and Anvil',     deploy:'short-12',          desc:'Deployment along short table edges, 12" deep.',             objectives:[{x:.5,y:.5},{x:.33,y:.25},{x:.33,y:.75},{x:.67,y:.25},{x:.67,y:.75}]},
+  {id:5, name:'Crucible of Battle',   deploy:'diagonal-corner-12',desc:'Angled deployment zones from opposite corners, 12" deep.',  objectives:[{x:.5,y:.5},{x:.25,y:.3},{x:.75,y:.3},{x:.25,y:.7},{x:.75,y:.7}]},
+  {id:6, name:'Dawn of War',          deploy:'long-6',            desc:'Deployment along long table edges, only 6" deep.',          objectives:[{x:.5,y:.5},{x:.2,y:.4},{x:.8,y:.4},{x:.2,y:.6},{x:.8,y:.6}]},
+];
+
+// ═══════════════════════════════════
+//  AOS MISSIONS  (table 44"×60")
+// ═══════════════════════════════════
+const MISSIONS_AOS = [
+  {id:1, name:'Savage Gains',           deploy:'long-12',            desc:'Deployment along long edges, 12" deep.',           objectives:[{x:.5,y:.5},{x:.25,y:.5},{x:.75,y:.5},{x:.5,y:.28},{x:.5,y:.72}]},
+  {id:2, name:'Ours for the Taking',    deploy:'diagonal',           desc:'Diagonal split – triangular deployment zones.',    objectives:[{x:.5,y:.5},{x:.25,y:.4},{x:.75,y:.6},{x:.5,y:.25},{x:.5,y:.75}]},
+  {id:3, name:'Battle for the Pass',    deploy:'short-12',           desc:'Deployment along short edges, 12" deep.',          objectives:[{x:.5,y:.5},{x:.33,y:.3},{x:.67,y:.3},{x:.33,y:.7},{x:.67,y:.7}]},
+  {id:4, name:'Tectonic Interference',  deploy:'diagonal-corner-12', desc:'Corner deployment zones, angled 12" from edge.',   objectives:[{x:.5,y:.5},{x:.3,y:.35},{x:.7,y:.65},{x:.7,y:.35},{x:.3,y:.65}]},
+  {id:5, name:'Clash of Spearheads',    deploy:'long-9',             desc:'Deployment along long edges, 9" deep.',            objectives:[{x:.5,y:.5},{x:.25,y:.33},{x:.75,y:.33},{x:.25,y:.67},{x:.75,y:.67}]},
+];
 
 // ═══════════════════════════════════
 //  SCENARIO DATA

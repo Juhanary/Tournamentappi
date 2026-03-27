@@ -101,6 +101,7 @@ function generatePairings(players, matches, bpTable, roundNum) {
     if (sa!==sb) return sb-sa;
     return getPlayerVP(b.id,matches)-getPlayerVP(a.id,matches);
   });
+
   let pool=[...sorted], byePlayer=null;
   if (pool.length%2!==0) {
     for (let i=pool.length-1;i>=0;i--) {
@@ -110,25 +111,59 @@ function generatePairings(players, matches, bpTable, roundNum) {
     }
     if (!byePlayer) byePlayer=pool.pop();
   }
+
+  // Round when a and b last faced each other (0 = never)
+  function lastMet(a, b) {
+    for (let r=matches.length-1; r>=0; r--) {
+      if (matches[r].pairs.some(p=>(p.p1===a&&p.p2===b)||(p.p1===b&&p.p2===a)))
+        return matches[r].round;
+    }
+    return 0;
+  }
+
   const paired=[];
   function tryPair(pl) {
     if (!pl.length) return true;
     const first=pl[0];
+    // 1. Try non-repeat pairings in standing order
     for (let i=1;i<pl.length;i++) {
       if (haveMet(first.id,pl[i].id,matches)) continue;
       const rest=pl.filter((_,j)=>j!==0&&j!==i);
       if (tryPair(rest)){paired.push({p1:first,p2:pl[i]});return true;}
     }
-    if (pl.length>=2){
-      paired.push({p1:first,p2:pl[1]});
-      return tryPair(pl.filter((_,j)=>j>1));
+    // 2. Forced repeat — pick opponent met least recently
+    if (pl.length>=2) {
+      let bestI=1, bestRound=Infinity;
+      for (let i=1;i<pl.length;i++) {
+        const r=lastMet(first.id,pl[i].id);
+        if (r<bestRound){bestRound=r;bestI=i;}
+      }
+      paired.push({p1:first,p2:pl[bestI]});
+      return tryPair(pl.filter((_,j)=>j!==0&&j!==bestI));
     }
     return false;
   }
   tryPair(pool);
-  let t=1;
-  const pairs=paired.map(m=>({table:t++,p1:m.p1.id,p2:m.p2.id,vp1:null,vp2:null,bye:false}));
-  if (byePlayer) pairs.push({table:t,p1:byePlayer.id,p2:null,vp1:null,vp2:null,bye:true});
+
+  // Table assignment: standings order (pair 0 = table 1).
+  // Then try swapping adjacent pairs (except table 1) to reduce same-table repeats.
+  const prevTable={};
+  if (matches.length>0) {
+    const last=matches[matches.length-1];
+    last.pairs.forEach(p=>{if(!p.bye){prevTable[p.p1]=p.table;prevTable[p.p2]=p.table;}});
+  }
+  const tables=paired.map((_,i)=>i+1);
+  for (let i=1;i<paired.length-1;i++) {
+    const [pa,pb]=[paired[i],paired[i+1]];
+    const [ta,tb]=[tables[i],tables[i+1]];
+    const cost = (x,t)=>(prevTable[x.p1.id]===t?1:0)+(prevTable[x.p2.id]===t?1:0);
+    if (cost(pa,tb)+cost(pb,ta) < cost(pa,ta)+cost(pb,tb)) {
+      tables[i]=tb; tables[i+1]=ta;
+    }
+  }
+
+  const pairs=paired.map((m,i)=>({table:tables[i],p1:m.p1.id,p2:m.p2.id,vp1:null,vp2:null,bye:false}));
+  if (byePlayer) pairs.push({table:paired.length+1,p1:byePlayer.id,p2:null,vp1:null,vp2:null,bye:true});
   return {round:roundNum, pairs};
 }
 
