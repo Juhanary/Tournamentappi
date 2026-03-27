@@ -87,15 +87,16 @@ function QRModal({url, onClose, onCopy}) {
   }
   return <div style={S.overlay} onClick={onClose}>
     <div style={{...S.modalBox,maxWidth:300,textAlign:'center'}} onClick={e=>e.stopPropagation()}>
-      <div style={{fontFamily:'Cinzel,serif',color:'var(--gold)',fontSize:14,marginBottom:4,letterSpacing:'.08em'}}>📡 Live Standings</div>
+      <div style={{fontFamily:'Cinzel,serif',color:'var(--gold)',fontSize:14,marginBottom:4,letterSpacing:'.08em'}}>📡 KOPIOI TURNAUSINFO JA TULOSPALVELU</div>
+     <button style={{...S.btn('gold'),marginTop:14,marginBottom:0}} onClick={copyLink}>
+        {copied ? '✓ Linkki kopioitu!' : '📋 Kopioi linkki'}
+      </button>
       <div style={{fontSize:12,color:'var(--steel)',marginBottom:16,lineHeight:1.5}}>
         Pelaajat skannaavat tämän — näkevät live-sijoitukset
       </div>
       <div ref={qrRef} style={{display:'inline-block',padding:12,background:'var(--d3)',borderRadius:6,border:'1px solid rgba(201,168,76,.3)'}}/>
       <div style={{fontSize:11,color:'var(--steel)',marginTop:12,wordBreak:'break-all',lineHeight:1.4}}>{url}</div>
-      <button style={{...S.btn('gold'),marginTop:14,marginBottom:0}} onClick={copyLink}>
-        {copied ? '✓ Linkki kopioitu!' : '📋 Kopioi linkki'}
-      </button>
+      
       <button style={{...S.btn('outline'),marginBottom:0,marginTop:8}} onClick={onClose}>Sulje</button>
     </div>
   </div>;
@@ -1351,9 +1352,9 @@ function TournamentApp({initConfig, tourneyId, onReset}) {
         </div>
         <div style={{display:'flex',gap:6,justifyContent:'center',marginTop:10,flexWrap:'wrap'}}>
           {[
-            {icon:'📡',label:'Live',fn:()=>setShowQR(true)},
-            {icon:'💾',label:'Save',fn:()=>setShowSave(true)},
-            {icon:'📤',label:'Export',fn:()=>setShowExport(true)},
+            {icon:'📡',label:'SHARE TO PLAYERS',fn:()=>setShowQR(true)},
+            {icon:'💾',label:'Save Tournament',fn:()=>setShowSave(true)},
+            {icon:'📤',label:'Export tournament',fn:()=>setShowExport(true)},
             {icon:'⚙',label:'Settings',fn:()=>setShowSettings(true)},
           ].map(b=>(
             <button key={b.label} onClick={b.fn}
