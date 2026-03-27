@@ -139,9 +139,118 @@ function StandingsTable({standings, round, live=false}) {
 // ═══════════════════════════════════
 //  VIEWER SCREEN (read-only live)
 // ═══════════════════════════════════
+function ViewerRoundCard({roundScenarios, currentRound}) {
+  const [expanded, setExpanded] = useState(null);
+
+  return <div style={{marginBottom:12}}>
+    {/* All rounds list */}
+    <div style={{display:'flex',flexDirection:'column',gap:6}}>
+      {(roundScenarios||[]).map((rs,i)=>{
+        const rn = i+1;
+        const sc = SCENARIOS.find(s=>s.id===rs.scenario);
+        if(!sc) return null;
+        const isCur = rn===currentRound;
+        const isPast = rn<currentRound;
+        const isFuture = rn>currentRound;
+        const reqSec=(sc.secRequired||[]).map(k=>SEC_OBJ[k]).filter(Boolean);
+        const optSec=Object.entries(rs.secObjs||{}).filter(([,v])=>v).map(([k])=>SEC_OBJ[k]).filter(Boolean);
+        const allSec=[...new Map([...reqSec,...optSec].map(o=>[o.name,o])).values()];
+        const isOpen = expanded===rn || isCur;
+
+        return <div key={i}
+          style={{background:'var(--d2)',
+            border:`1px solid ${isCur?'var(--gold)':isPast?'rgba(201,168,76,.12)':'rgba(201,168,76,.2)'}`,
+            borderRadius:4,overflow:'hidden',opacity:isFuture?.7:1}}>
+
+          {/* Row header — clickable */}
+          <div onClick={()=>setExpanded(isOpen&&!isCur?null:rn)}
+            style={{display:'flex',gap:0,cursor:'pointer',alignItems:'stretch'}}>
+            <div style={{width:70,flexShrink:0}}>
+              <img src={SCENARIO_MAPS[sc.id]} alt={sc.name}
+                style={{width:'100%',display:'block',opacity:isFuture?.5:isPast?.65:1}}/>
+            </div>
+            <div style={{padding:'8px 10px',flex:1,minWidth:0}}>
+              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}>
+                {isCur&&<span style={{width:7,height:7,borderRadius:'50%',background:'var(--win)',
+                  boxShadow:'0 0 5px var(--win)',flexShrink:0,display:'inline-block'}}/>}
+                {isPast&&<span style={{fontSize:11,color:'var(--steel)'}}>✓</span>}
+                <span style={{fontFamily:'Cinzel,serif',fontSize:11,
+                  color:isCur?'var(--gold)':isPast?'var(--steel)':'var(--text)',
+                  letterSpacing:'.05em'}}>
+                  Round {rn}{isCur?' — NOW PLAYING':''}
+                </span>
+              </div>
+              <div style={{fontSize:12,color:isCur?'var(--text)':'var(--steel)',
+                whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                {sc.name}
+              </div>
+              {allSec.length>0&&<div style={{fontSize:10,color:'var(--steel)',marginTop:2,
+                whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                {allSec.map(o=>o.icon+' '+o.name).join(' · ')}
+              </div>}
+            </div>
+            <div style={{padding:'0 10px',display:'flex',alignItems:'center',
+              color:'var(--steel)',fontSize:12,flexShrink:0}}>
+              {isOpen?'▲':'▼'}
+            </div>
+          </div>
+
+          {/* Expanded detail */}
+          {isOpen&&<div style={{borderTop:`1px solid ${isCur?'rgba(201,168,76,.3)':'rgba(201,168,76,.1)'}`,
+            padding:'12px 14px',background:'var(--d3)'}}>
+
+            {/* Map full size */}
+            <img src={SCENARIO_MAPS[sc.id]} alt={sc.name}
+              style={{width:'100%',borderRadius:3,display:'block',marginBottom:10}}/>
+
+            <div style={{fontFamily:'Cinzel,serif',fontSize:13,color:'var(--gold)',
+              marginBottom:4,letterSpacing:'.06em'}}>{sc.id}. {sc.name}</div>
+            <div style={{fontSize:12,color:'var(--steel)',lineHeight:1.6,marginBottom:6}}>{sc.desc}</div>
+            {sc.special!=='No special rules.'&&
+              <div style={{fontSize:12,color:'#E0D0B0',lineHeight:1.5,marginBottom:6,
+                background:'rgba(201,168,76,.05)',border:'1px solid rgba(201,168,76,.15)',
+                borderRadius:3,padding:'8px 10px'}}>
+                ⚡ {sc.special}
+              </div>}
+            <div style={{fontSize:11,color:'var(--steel)',marginBottom:allSec.length?12:0}}>
+              ⏱ {sc.gameLength}
+            </div>
+
+            {/* Secondary objectives */}
+            {allSec.length>0&&<>
+              <div style={{fontFamily:'Cinzel,serif',fontSize:10,color:'var(--gold)',
+                letterSpacing:'.08em',textTransform:'uppercase',marginBottom:8}}>
+                Secondary Objectives
+              </div>
+              {allSec.map(obj=>{
+                const objKey=Object.keys(SEC_OBJ).find(k=>SEC_OBJ[k]===obj);
+                const objMap=OBJECTIVE_MAPS[objKey];
+                return <div key={obj.name} style={{marginBottom:10}}>
+                  <div style={{display:'flex',gap:8,padding:'8px 10px',
+                    background:'rgba(201,168,76,.06)',border:'1px solid rgba(201,168,76,.18)',
+                    borderRadius:3,marginBottom:objMap?6:0}}>
+                    <span style={{fontSize:16,flexShrink:0}}>{obj.icon}</span>
+                    <div>
+                      <div style={{fontFamily:'Cinzel,serif',fontSize:11,color:'var(--gold)',marginBottom:2}}>{obj.name}</div>
+                      <div style={{fontSize:11,color:'var(--steel)',lineHeight:1.4}}>{obj.desc}</div>
+                    </div>
+                  </div>
+                  {objMap&&<img src={objMap} alt={obj.name}
+                    style={{width:'100%',borderRadius:3,display:'block'}}/>}
+                </div>;
+              })}
+            </>}
+          </div>}
+        </div>;
+      })}
+    </div>
+  </div>;
+}
+
 function ViewerScreen({tourneyId}) {
   const [data, setData] = useState(null);
   const [connected, setConnected] = useState(false);
+  const [tab, setTab] = useState('standings');
 
   useEffect(()=>{
     fbOn(`tournaments/${tourneyId}`, val => {
@@ -162,20 +271,32 @@ function ViewerScreen({tourneyId}) {
   );
 
   const standings = calcStandings(data.players, data.matches||[], data.config?.bpTable||DEFAULT_BP);
+  const round = data.round||0;
+  const cfg = data.config||{};
+  const tabs = [{k:'standings',label:'🏆 Standings'},{k:'rounds',label:'🗺 Rounds'}];
 
   return (
     <div style={{minHeight:'100vh',background:'var(--dark)',backgroundImage:'radial-gradient(ellipse at 20% 0%,rgba(139,0,0,.12) 0%,transparent 50%)'}}>
       <div style={S.hdr}>
-        <div style={S.h1}>{data.config?.name||'Tournament'}</div>
+        <div style={S.h1}>{cfg.name||'Tournament'}</div>
         <div style={S.hsub}>
-          Round {data.round||0}/{data.config?.rounds||'?'} &nbsp;·&nbsp;
+          Round {round}/{cfg.rounds||'?'} &nbsp;·&nbsp;
           <span style={{color:'var(--win)'}}>● LIVE</span>
         </div>
       </div>
+      <div style={S.nav}>
+        {tabs.map(t=><button key={t.k} style={S.navBtn(tab===t.k)} onClick={()=>setTab(t.k)}>{t.label}</button>)}
+      </div>
       <div style={S.page}>
-        <Card title="🏆 Standings">
-          <StandingsTable standings={standings} round={data.round||0} live={true}/>
-        </Card>
+        {tab==='standings'&&<Card title="🏆 Standings">
+          <StandingsTable standings={standings} round={round} live={true}/>
+        </Card>}
+        {tab==='rounds'&&<Card title="🗺 Scenarios & Rules">
+          <ViewerRoundCard
+            roundScenarios={cfg.roundScenarios}
+            currentRound={round}
+          />
+        </Card>}
       </div>
     </div>
   );
@@ -267,6 +388,75 @@ function SecObjPicker({scenario, value, onChange}) {
         </div>
       </div>;
     })}
+  </div>;
+}
+
+// ═══════════════════════════════════
+//  ROUND SCENARIOS PANEL (collapsible)
+// ═══════════════════════════════════
+function RoundScenariosPanel({config, curRd}) {
+  const [open, setOpen] = useState(false);
+  const allRounds = config.roundScenarios||[];
+  return <div style={{marginBottom:12}}>
+    <button style={{...S.btn('outline'),marginBottom:0,padding:'8px 14px',
+      fontSize:11,letterSpacing:'.06em'}}
+      onClick={()=>setOpen(v=>!v)}>
+      🗺 {open?'Hide':'Show'} Scenarios All Rounds
+    </button>
+    {open&&<div style={{marginTop:8,display:'flex',flexDirection:'column',gap:8}}>
+      {allRounds.map((rs,i)=>{
+        const sc=SCENARIOS.find(s=>s.id===rs.scenario);
+        if(!sc)return null;
+        const isCur=i+1===curRd.round;
+        const isPast=i+1<curRd.round;
+        const reqSec=(sc.secRequired||[]).map(k=>SEC_OBJ[k]).filter(Boolean);
+        const optSec=Object.entries(rs.secObjs||{}).filter(([,v])=>v).map(([k])=>SEC_OBJ[k]).filter(Boolean);
+        const allSec=[...new Map([...reqSec,...optSec].map(o=>[o.name,o])).values()];
+        return <div key={i} style={{background:'var(--d3)',
+          border:`1px solid ${isCur?'var(--gold)':isPast?'rgba(201,168,76,.1)':'rgba(201,168,76,.2)'}`,
+          borderRadius:4,overflow:'hidden',opacity:isPast?.65:1}}>
+          <div style={{display:'flex',gap:0}}>
+            <div style={{width:80,flexShrink:0}}>
+              <ScenarioMap id={sc.id}/>
+            </div>
+            <div style={{padding:'8px 10px',flex:1}}>
+              <div style={{fontFamily:'Cinzel,serif',fontSize:11,
+                color:isCur?'var(--gold)':'var(--steel)',
+                letterSpacing:'.05em',marginBottom:3}}>
+                {isCur&&<span style={{color:'var(--win)'}}>● </span>}
+                Round {i+1} · {sc.name}
+              </div>
+              {sc.special!=='No special rules.'&&
+                <div style={{fontSize:10,color:'#E0D0B0',lineHeight:1.4,marginBottom:3}}>
+                  ⚡ {sc.special}
+                </div>}
+              {allSec.length>0&&<div style={{fontSize:10,color:'var(--steel)',lineHeight:1.4}}>
+                {allSec.map(o=>o.icon+' '+o.name).join(' · ')}
+              </div>}
+            </div>
+          </div>
+          {isCur&&allSec.length>0&&<div style={{padding:'6px 10px 8px',
+            borderTop:'1px solid rgba(201,168,76,.1)'}}>
+            {allSec.map(obj=>{
+              const objMap=OBJECTIVE_MAPS[Object.keys(SEC_OBJ).find(k=>SEC_OBJ[k]===obj)];
+              return <div key={obj.name} style={{marginBottom:8}}>
+                <div style={{display:'flex',gap:6,fontSize:11,marginBottom:objMap?6:0}}>
+                  <span>{obj.icon}</span>
+                  <div>
+                    <span style={{color:'var(--gold)',fontFamily:'Cinzel,serif',fontSize:10}}>
+                      {obj.name}
+                    </span>
+                    <span style={{color:'var(--steel)'}}> — {obj.desc}</span>
+                  </div>
+                </div>
+                {objMap&&<img src={objMap} alt={obj.name}
+                  style={{width:'100%',borderRadius:3,display:'block'}}/>}
+              </div>;
+            })}
+          </div>}
+        </div>;
+      })}
+    </div>}
   </div>;
 }
 
@@ -656,71 +846,7 @@ function TournamentApp({initConfig, tourneyId, onReset}) {
               <span style={S.badge(curDone?'ok':'rd')}>{curDone?'Complete':'In Progress'}</span>
             </div>
 
-            {(()=>{
-              const [open,setOpen] = React.useState(false);
-              const allRounds = config.roundScenarios||[];
-              return <div style={{marginBottom:12}}>
-                <button style={{...S.btn('outline'),marginBottom:0,padding:'8px 14px',
-                  fontSize:11,letterSpacing:'.06em'}}
-                  onClick={()=>setOpen(v=>!v)}>
-                  🗺 {open?'Hide':'Show'} Scenarios All Rounds
-                </button>
-                {open&&<div style={{marginTop:8,display:'flex',flexDirection:'column',gap:8}}>
-                  {allRounds.map((rs,i)=>{
-                    const sc=SCENARIOS.find(s=>s.id===rs.scenario);
-                    if(!sc)return null;
-                    const isCur=i+1===curRd.round;
-                    const isPast=i+1<curRd.round;
-                    const reqSec=(sc.secRequired||[]).map(k=>SEC_OBJ[k]).filter(Boolean);
-                    const optSec=Object.entries(rs.secObjs||{}).filter(([,v])=>v).map(([k])=>SEC_OBJ[k]).filter(Boolean);
-                    const allSec=[...new Map([...reqSec,...optSec].map(o=>[o.name,o])).values()];
-                    return <div key={i} style={{background:'var(--d3)',
-                      border:`1px solid ${isCur?'var(--gold)':isPast?'rgba(201,168,76,.1)':'rgba(201,168,76,.2)'}`,
-                      borderRadius:4,overflow:'hidden',opacity:isPast?.65:1}}>
-                      <div style={{display:'flex',gap:0}}>
-                        <div style={{width:80,flexShrink:0}}>
-                          <ScenarioMap id={sc.id}/>
-                        </div>
-                        <div style={{padding:'8px 10px',flex:1}}>
-                          <div style={{fontFamily:'Cinzel,serif',fontSize:11,
-                            color:isCur?'var(--gold)':'var(--steel)',
-                            letterSpacing:'.05em',marginBottom:3}}>
-                            {isCur&&<span style={{color:'var(--win)'}}>● </span>}
-                            Round {i+1} · {sc.name}
-                          </div>
-                          {sc.special!=='No special rules.'&&
-                            <div style={{fontSize:10,color:'#E0D0B0',lineHeight:1.4,marginBottom:3}}>
-                              ⚡ {sc.special}
-                            </div>}
-                          {allSec.length>0&&<div style={{fontSize:10,color:'var(--steel)',lineHeight:1.4}}>
-                            {allSec.map(o=>o.icon+' '+o.name).join(' · ')}
-                          </div>}
-                        </div>
-                      </div>
-                      {isCur&&allSec.length>0&&<div style={{padding:'6px 10px 8px',
-                        borderTop:'1px solid rgba(201,168,76,.1)'}}>
-                        {allSec.map(obj=>{
-                          const objMap=OBJECTIVE_MAPS[Object.keys(SEC_OBJ).find(k=>SEC_OBJ[k]===obj)];
-                          return <div key={obj.name} style={{marginBottom:8}}>
-                            <div style={{display:'flex',gap:6,fontSize:11,marginBottom:objMap?6:0}}>
-                              <span>{obj.icon}</span>
-                              <div>
-                                <span style={{color:'var(--gold)',fontFamily:'Cinzel,serif',fontSize:10}}>
-                                  {obj.name}
-                                </span>
-                                <span style={{color:'var(--steel)'}}> — {obj.desc}</span>
-                              </div>
-                            </div>
-                            {objMap&&<img src={objMap} alt={obj.name}
-                              style={{width:'100%',borderRadius:3,display:'block'}}/>}
-                          </div>;
-                        })}
-                      </div>}
-                    </div>;
-                  })}
-                </div>}
-              </div>;
-            })()}
+            <RoundScenariosPanel config={config} curRd={curRd}/>
 
             {curRd.pairs.map((p,i)=>{
               if(p.bye){const pl=players.find(x=>x.id===p.p1);return(
