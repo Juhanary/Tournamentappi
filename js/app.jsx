@@ -1047,7 +1047,6 @@ function App() {
 
   const params    = new URLSearchParams(window.location.search);
   const viewerId  = params.get('t');
-  if (viewerId) return <ViewerScreen tourneyId={viewerId}/>;
 
   const hasSession = !!localStorage.getItem(SAVE_KEY);
   const [started, setStarted] = useState(hasSession);
@@ -1060,6 +1059,8 @@ function App() {
     localStorage.setItem('wh_tourney_id', id);
     return id;
   });
+
+  if (viewerId) return <ViewerScreen tourneyId={viewerId}/>;
 
   function handleStart(cfg) {
     localStorage.removeItem(SAVE_KEY);
