@@ -304,7 +304,7 @@ function ViewerScreen({tourneyId}) {
   const standings = calcStandings(data.players, data.matches||[], data.config?.bpTable||DEFAULT_BP);
   const round = data.round||0;
   const cfg = data.config||{};
-  const tabs = [{k:'standings',label:'🏆 Standings'},{k:'rounds',label:'🗺 Rounds'}];
+  const tabs = [{k:'standings',label:'🏆 Standings'},{k:'rounds',label:'⚔ Round'}];
 
   return (
     <div style={{minHeight:'100vh',background:'var(--dark)',backgroundImage:'radial-gradient(ellipse at 20% 0%,rgba(139,0,0,.12) 0%,transparent 50%)'}}>
@@ -322,39 +322,103 @@ function ViewerScreen({tourneyId}) {
         {tab==='standings'&&<Card title="🏆 Standings">
           <StandingsTable standings={standings} round={round} live={true}/>
         </Card>}
-        {tab==='rounds'&&(cfg.game==='tow'
-          ? <Card title="🗺 Scenarios & Rules">
-              <ViewerRoundCard roundScenarios={cfg.roundScenarios} currentRound={round}/>
-            </Card>
-          : (cfg.game==='40k'||cfg.game==='aos')
-            ? <Card title="🗺 Missions">
-                <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                  {(cfg.roundMissions||[]).map((mId,i)=>{
-                    const missions = cfg.game==='40k' ? MISSIONS_40K : MISSIONS_AOS;
-                    const m = missions.find(x=>x.id===mId)||missions[0];
-                    const rn = i+1;
-                    const isCur = rn===round;
-                    const isPast = rn<round;
-                    return <div key={i} style={{background:'var(--d2)',
-                      border:`1px solid ${isCur?'var(--gold)':isPast?'rgba(201,168,76,.12)':'rgba(201,168,76,.2)'}`,
-                      borderRadius:4,overflow:'hidden',opacity:rn>round?.7:1,padding:'10px 12px'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-                        {isCur&&<span style={{width:7,height:7,borderRadius:'50%',background:'var(--win)',
-                          boxShadow:'0 0 5px var(--win)',flexShrink:0,display:'inline-block'}}/>}
-                        {isPast&&<span style={{fontSize:11,color:'var(--steel)'}}>✓</span>}
-                        <span style={{fontFamily:'Cinzel,serif',fontSize:11,
-                          color:isCur?'var(--gold)':'var(--steel)',letterSpacing:'.05em'}}>
-                          Round {rn}{isCur?' — NOW PLAYING':''}
-                        </span>
-                        <span style={{fontSize:11,color:'var(--text)',marginLeft:4}}>{m.name}</span>
+
+        {tab==='rounds'&&<>
+          {/* ── Current round pairings ── */}
+          {round>0&&(()=>{
+            const curRd=(data.matches||[]).find(m=>m.round===round);
+            if(!curRd)return null;
+            const allDone=curRd.pairs.every(p=>p.bye||(p.vp1!=null&&p.vp2!=null));
+            const bpTbl=cfg.bpTable||DEFAULT_BP;
+            return <Card title={`⚔ Round ${round} — Pairings`}>
+              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
+                <div style={{width:8,height:8,borderRadius:'50%',
+                  background:allDone?'var(--draw)':'var(--win)',
+                  boxShadow:`0 0 6px ${allDone?'var(--draw)':'var(--win)'}`}}/>
+                <span style={{fontSize:11,color:'var(--steel)',fontFamily:'Cinzel,serif',letterSpacing:'.06em'}}>
+                  {allDone?'COMPLETE':'NOW PLAYING'}
+                </span>
+              </div>
+              {curRd.pairs.map((p,i)=>{
+                const pl1=data.players.find(x=>x.id===p.p1);
+                const pl2=data.players.find(x=>x.id===p.p2);
+                const hasBoth=p.vp1!=null&&p.vp2!=null;
+                const calc=hasBoth?calcBP(p.vp1,p.vp2,bpTbl):null;
+                if(p.bye)return(
+                  <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'10px 12px',
+                    background:'var(--d3)',border:'1px solid rgba(201,168,76,.14)',borderRadius:3,marginBottom:6}}>
+                    <div style={{fontFamily:'Cinzel,serif',fontSize:9,color:'var(--steel)',minWidth:54,letterSpacing:'.08em',textTransform:'uppercase'}}>Bye</div>
+                    <div style={{fontWeight:600,fontSize:14}}>{pl1?.name}</div>
+                    <span style={{marginLeft:'auto',background:'rgba(201,168,76,.14)',color:'var(--gold)',
+                      fontSize:10,padding:'2px 8px',borderRadius:2,fontFamily:'Cinzel,serif',
+                      border:'1px solid rgba(201,168,76,.3)'}}>+20BP</span>
+                  </div>
+                );
+                return(
+                  <div key={i} style={{padding:'10px 12px',background:'var(--d3)',
+                    border:'1px solid rgba(201,168,76,.18)',borderRadius:3,marginBottom:6}}>
+                    <div style={{fontFamily:'Cinzel,serif',fontSize:9,color:'var(--steel)',
+                      letterSpacing:'.1em',textTransform:'uppercase',marginBottom:8,textAlign:'center'}}>
+                      Table {p.table}
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',alignItems:'center',gap:6}}>
+                      <div>
+                        <div style={{fontWeight:600,fontSize:15,lineHeight:1.2}}>{pl1?.name}</div>
+                        {hasBoth&&<div style={S.resBadge(calc.bp1)}>{wdl(calc.bp1)} {calc.bp1}BP</div>}
                       </div>
-                      <DeployMapSVG mission={m} style={{borderRadius:3,border:'1px solid rgba(201,168,76,.15)'}}/>
-                    </div>;
-                  })}
-                </div>
+                      <div style={{textAlign:'center'}}>
+                        <div style={{fontFamily:'Cinzel,serif',fontSize:12,color:'var(--blood)',fontWeight:700}}>VS</div>
+                        {hasBoth&&<div style={{fontFamily:'Cinzel,serif',fontSize:11,color:'var(--gold)',
+                          marginTop:4,lineHeight:1.3}}>
+                          {p.vp1}<span style={{color:'var(--steel)',fontSize:10}}>–</span>{p.vp2}
+                        </div>}
+                      </div>
+                      <div style={{textAlign:'right'}}>
+                        <div style={{fontWeight:600,fontSize:15,lineHeight:1.2}}>{pl2?.name}</div>
+                        {hasBoth&&<div style={{...S.resBadge(calc.bp2),float:'right',clear:'both'}}>{wdl(calc.bp2)} {calc.bp2}BP</div>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </Card>;
+          })()}
+
+          {/* ── Scenario / Mission info ── */}
+          {cfg.game==='tow'
+            ? <Card title="🗺 Scenarios & Rules">
+                <ViewerRoundCard roundScenarios={cfg.roundScenarios} currentRound={round}/>
               </Card>
-            : null
-        )}
+            : (cfg.game==='40k'||cfg.game==='aos')
+              ? <Card title="🗺 Missions">
+                  <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                    {(cfg.roundMissions||[]).map((mId,i)=>{
+                      const missions=cfg.game==='40k'?MISSIONS_40K:MISSIONS_AOS;
+                      const m=missions.find(x=>x.id===mId)||missions[0];
+                      const rn=i+1;
+                      const isCur=rn===round;
+                      const isPast=rn<round;
+                      return <div key={i} style={{background:'var(--d2)',
+                        border:`1px solid ${isCur?'var(--gold)':isPast?'rgba(201,168,76,.12)':'rgba(201,168,76,.2)'}`,
+                        borderRadius:4,overflow:'hidden',opacity:rn>round?.7:1,padding:'10px 12px'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+                          {isCur&&<span style={{width:7,height:7,borderRadius:'50%',background:'var(--win)',
+                            boxShadow:'0 0 5px var(--win)',flexShrink:0,display:'inline-block'}}/>}
+                          {isPast&&<span style={{fontSize:11,color:'var(--steel)'}}>✓</span>}
+                          <span style={{fontFamily:'Cinzel,serif',fontSize:11,
+                            color:isCur?'var(--gold)':'var(--steel)',letterSpacing:'.05em'}}>
+                            Round {rn}{isCur?' — NOW PLAYING':''}
+                          </span>
+                          <span style={{fontSize:11,color:'var(--text)',marginLeft:4}}>{m.name}</span>
+                        </div>
+                        <DeployMapSVG mission={m} style={{borderRadius:3,border:'1px solid rgba(201,168,76,.15)'}}/>
+                      </div>;
+                    })}
+                  </div>
+                </Card>
+              : null
+          }
+        </>}
       </div>
     </div>
   );
