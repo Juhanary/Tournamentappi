@@ -69,7 +69,7 @@ function BPModal({table,onSave,onClose}) {
   </div></div>;
 }
 
-function QRModal({url, tourney, onClose, adminUrl}) {
+function QRModal({url, onClose}) {
   const qrRef = useRef();
   useEffect(()=>{
     if (qrRef.current && window.QRCode) {
@@ -90,15 +90,31 @@ function QRModal({url, tourney, onClose, adminUrl}) {
       <div ref={qrRef} style={{display:'inline-block',padding:12,background:'var(--d3)',borderRadius:6,border:'1px solid rgba(201,168,76,.3)'}}/>
       <div style={{fontSize:11,color:'var(--steel)',marginTop:12,wordBreak:'break-all',lineHeight:1.4}}>{url}</div>
       <button style={{...S.btn('gold'),marginTop:14,marginBottom:0}} onClick={()=>navigator.clipboard?.writeText(url).then(()=>{})}>Copy Link</button>
-      {adminUrl&&<>
-        <div style={{borderTop:'1px solid rgba(201,168,76,.2)',marginTop:14,paddingTop:14}}>
-          <div style={{fontFamily:'Cinzel,serif',color:'var(--gold)',fontSize:11,marginBottom:6,letterSpacing:'.08em'}}>🔧 Hallintälinkki</div>
-          <div style={{fontSize:10,color:'var(--steel)',marginBottom:8,lineHeight:1.5}}>Avaa toisella koneella jatkaaksesi hallintaa</div>
-          <div style={{fontSize:10,color:'var(--steel)',wordBreak:'break-all',lineHeight:1.4,marginBottom:8}}>{adminUrl}</div>
-          <button style={{...S.btn('outline',true),fontSize:11,marginBottom:0}} onClick={()=>navigator.clipboard?.writeText(adminUrl).then(()=>{})}>Copy Admin Link</button>
-        </div>
-      </>}
       <button style={{...S.btn('outline'),marginBottom:0,marginTop:8}} onClick={onClose}>Close</button>
+    </div>
+  </div>;
+}
+
+function SaveModal({adminUrl, onClose}) {
+  const [copied, setCopied] = useState(false);
+  function copy() {
+    navigator.clipboard?.writeText(adminUrl).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2000);});
+  }
+  return <div style={S.overlay} onClick={onClose}>
+    <div style={{...S.modalBox,maxWidth:320}} onClick={e=>e.stopPropagation()}>
+      <div style={{fontFamily:'Cinzel,serif',color:'var(--gold)',fontSize:14,marginBottom:6,letterSpacing:'.08em'}}>💾 Tallenna turnaus</div>
+      <div style={{fontSize:12,color:'var(--steel)',marginBottom:16,lineHeight:1.6}}>
+        Kopioi tämä linkki — avaa se toisella koneella tai selaimella jatkaaksesi hallintaa.
+      </div>
+      <div style={{background:'var(--d3)',border:'1px solid rgba(201,168,76,.25)',borderRadius:3,
+        padding:'10px 12px',fontSize:11,color:'var(--steel)',wordBreak:'break-all',
+        lineHeight:1.5,marginBottom:12}}>
+        {adminUrl}
+      </div>
+      <button style={{...S.btn('gold'),marginBottom:8}} onClick={copy}>
+        {copied ? '✓ Kopioitu!' : '📋 Kopioi linkki'}
+      </button>
+      <button style={{...S.btn('outline'),marginBottom:0}} onClick={onClose}>Sulje</button>
     </div>
   </div>;
 }
@@ -699,6 +715,94 @@ function StartScreen({onStart}) {
 }
 
 // ═══════════════════════════════════
+//  EXPORT MODAL
+// ═══════════════════════════════════
+function ExportModal({onClose, standings, matches, config, players}) {
+  function exportCSV() {
+    const lines = [
+      ['Sija','Pelaaja','BP','VP','V','T','H','SOS'].join(','),
+      ...standings.map((p,i)=>[
+        i+1, `"${p.name}"`, p.bp, p.vp, p.rec.w, p.rec.d, p.rec.l, p.sos
+      ].join(','))
+    ];
+    lines.push('');
+    lines.push(['Kierros','Pöytä','Pelaaja 1','VP1','BP1','Pelaaja 2','VP2','BP2'].join(','));
+    matches.forEach(rd=>{
+      rd.pairs.forEach(p=>{
+        const pl1=players.find(x=>x.id===p.p1);
+        const pl2=players.find(x=>x.id===p.p2);
+        if(p.bye){lines.push([rd.round,'','','BYE',`"${pl1?.name||''}"`,20,'',''].join(','));return;}
+        if(p.vp1==null){lines.push([rd.round,p.table,`"${pl1?.name||''}"`,'-','-',`"${pl2?.name||''}"`,'-','-'].join(','));return;}
+        const c=calcBP(p.vp1,p.vp2,config.bpTable);
+        lines.push([rd.round,p.table,`"${pl1?.name||''}"`,p.vp1,c.bp1,`"${pl2?.name||''}"`,p.vp2,c.bp2].join(','));
+      });
+    });
+    const blob=new Blob(['\uFEFF'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`${config.name.replace(/\s+/g,'-')}-tulokset.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function exportPDF() {
+    const rows=standings.map((p,i)=>`
+      <tr>
+        <td>${i+1}</td><td>${p.name}</td><td><strong>${p.bp}</strong></td>
+        <td>${p.vp.toLocaleString()}</td>
+        <td>${p.rec.w}–${p.rec.d}–${p.rec.l}</td><td>${p.sos}</td>
+      </tr>`).join('');
+    const rdRows=[...matches].reverse().map(rd=>{
+      const pairs=rd.pairs.map(p=>{
+        const pl1=players.find(x=>x.id===p.p1),pl2=players.find(x=>x.id===p.p2);
+        if(p.bye)return`<tr><td colspan="4">${pl1?.name} — <em>BYE +20BP</em></td></tr>`;
+        if(p.vp1==null)return`<tr><td>${pl1?.name}</td><td colspan="3">${pl2?.name} — <em>ei tulosta</em></td></tr>`;
+        const c=calcBP(p.vp1,p.vp2,config.bpTable);
+        return`<tr><td>${pl1?.name}</td><td>${p.vp1} VP · ${c.bp1} BP</td><td>${p.vp2} VP · ${c.bp2} BP</td><td>${pl2?.name}</td></tr>`;
+      }).join('');
+      return`<h3>Kierros ${rd.round}</h3><table>${pairs}</table>`;
+    }).join('');
+    const w=window.open('','_blank');
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+      <title>${config.name}</title>
+      <style>
+        body{font-family:Arial,sans-serif;margin:32px;color:#111}
+        h1{font-size:22px;margin-bottom:4px}h2{font-size:16px;color:#555;margin-top:24px}h3{font-size:14px;margin:16px 0 6px;color:#333}
+        table{border-collapse:collapse;width:100%;margin-bottom:16px}
+        th,td{border:1px solid #ddd;padding:6px 10px;text-align:left;font-size:13px}
+        th{background:#f5f5f5;font-weight:600}tr:nth-child(even){background:#fafafa}
+        @media print{body{margin:16px}}
+      </style></head><body>
+      <h1>${config.name}</h1>
+      <p style="color:#666;font-size:13px">${config.rounds} kierrosta · ${players.length} pelaajaa</p>
+      <h2>Sijoitukset</h2>
+      <table><thead><tr><th>Sija</th><th>Pelaaja</th><th>BP</th><th>VP</th><th>V–T–H</th><th>SOS</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+      <h2>Tulokset</h2>${rdRows}
+      </body></html>`);
+    w.document.close();
+    setTimeout(()=>w.print(),400);
+  }
+
+  return <div style={S.overlay}><div style={{...S.modalBox,maxWidth:320}}>
+    <div style={{fontFamily:'Cinzel,serif',color:'var(--gold)',fontSize:14,marginBottom:14,letterSpacing:'.08em'}}>📤 Vie tulokset</div>
+    <button style={{...S.btn('gold'),marginBottom:10}} onClick={exportCSV}>
+      📊 CSV — Excel / Google Sheets
+    </button>
+    <div style={{fontSize:11,color:'var(--steel)',marginBottom:14,marginTop:-6,lineHeight:1.5}}>
+      Sijoitukset + kaikki kierrostulokset
+    </div>
+    <button style={{...S.btn('red'),marginBottom:10}} onClick={exportPDF}>
+      🖨 PDF — Tulostettava raportti
+    </button>
+    <div style={{fontSize:11,color:'var(--steel)',marginBottom:14,marginTop:-6,lineHeight:1.5}}>
+      Avautuu uuteen välilehteen → tulosta tai tallenna PDF
+    </div>
+    <button style={{...S.btn('outline'),marginBottom:0}} onClick={onClose}>Sulje</button>
+  </div></div>;
+}
+
+// ═══════════════════════════════════
 //  TOURNAMENT APP
 // ═══════════════════════════════════
 function TournamentApp({initConfig, tourneyId, onReset}) {
@@ -714,8 +818,10 @@ function TournamentApp({initConfig, tourneyId, onReset}) {
   const [config,  setConfig]  = useState(loadedState?.config   || initConfig);
   const [toast,   setToast]   = useState(null);
   const [confirm, setConfirm] = useState(null);
-  const [showBP,  setShowBP]  = useState(false);
-  const [showQR,  setShowQR]  = useState(false);
+  const [showBP,     setShowBP]     = useState(false);
+  const [showQR,     setShowQR]     = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [showSave,   setShowSave]   = useState(false);
   const [newName, setNewName] = useState('');
   const toastRef    = useRef();
   const firstRender = useRef(true);
@@ -783,7 +889,9 @@ function TournamentApp({initConfig, tourneyId, onReset}) {
       {toast   &&<Toast msg={toast.msg} err={toast.err}/>}
       {confirm &&<ConfirmModal {...confirm} onClose={()=>setConfirm(null)}/>}
       {showBP  &&<BPModal table={config.bpTable} onSave={t=>{setConfig(c=>({...c,bpTable:t}));setShowBP(false);showToast('BP table saved!');}} onClose={()=>setShowBP(false)}/>}
-      {showQR  &&<QRModal url={viewerURL} tourney={config.name} onClose={()=>setShowQR(false)} adminUrl={adminURL}/>}
+      {showQR     &&<QRModal url={viewerURL} onClose={()=>setShowQR(false)}/>}
+      {showExport &&<ExportModal onClose={()=>setShowExport(false)} standings={standings} matches={matches} config={config} players={players}/>}
+      {showSave   &&<SaveModal adminUrl={adminURL} onClose={()=>setShowSave(false)}/>}
 
       <div style={S.hdr}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
@@ -1036,6 +1144,13 @@ function TournamentApp({initConfig, tourneyId, onReset}) {
           <Card title="📡 Live Standings">
             <div style={S.msg}>Pelaajat voivat seurata sijoituksia live QR-koodin tai linkin kautta.</div>
             <button style={S.btn('blue')} onClick={()=>setShowQR(true)}>📡 Show QR Code</button>
+          </Card>
+          <Card title="💾 Tallenna turnaus">
+            <div style={S.msg}>Jatka hallintaa toisella koneella tai selaimella.</div>
+            <button style={S.btn('blue')} onClick={()=>setShowSave(true)}>💾 Save Tournament Link</button>
+          </Card>
+          <Card title="📤 Vie tulokset">
+            <button style={S.btn('gold')} onClick={()=>setShowExport(true)}>📤 Export CSV / PDF</button>
           </Card>
           <Card title="⚠ Danger Zone">
             <button style={S.btn('danger')} onClick={()=>setConfirm({
