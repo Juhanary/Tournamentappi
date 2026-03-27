@@ -312,7 +312,7 @@ function ViewerScreen({tourneyId}) {
         <div style={S.h1}>{cfg.name||'Tournament'}</div>
         <div style={S.hsub}>
           Round {round}/{cfg.rounds||'?'} &nbsp;·&nbsp;
-          <span style={{color:'var(--win)'}}>● LIVE</span>
+          <span style={{color:'var(--win)'}}>● JAA PELAAJILLE</span>
         </div>
       </div>
       <div style={S.nav}>
