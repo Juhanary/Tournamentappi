@@ -69,7 +69,7 @@ function BPModal({table,onSave,onClose}) {
   </div></div>;
 }
 
-function QRModal({url, tourney, onClose}) {
+function QRModal({url, tourney, onClose, adminUrl}) {
   const qrRef = useRef();
   useEffect(()=>{
     if (qrRef.current && window.QRCode) {
@@ -90,7 +90,15 @@ function QRModal({url, tourney, onClose}) {
       <div ref={qrRef} style={{display:'inline-block',padding:12,background:'var(--d3)',borderRadius:6,border:'1px solid rgba(201,168,76,.3)'}}/>
       <div style={{fontSize:11,color:'var(--steel)',marginTop:12,wordBreak:'break-all',lineHeight:1.4}}>{url}</div>
       <button style={{...S.btn('gold'),marginTop:14,marginBottom:0}} onClick={()=>navigator.clipboard?.writeText(url).then(()=>{})}>Copy Link</button>
-      <button style={{...S.btn('outline'),marginBottom:0}} onClick={onClose}>Close</button>
+      {adminUrl&&<>
+        <div style={{borderTop:'1px solid rgba(201,168,76,.2)',marginTop:14,paddingTop:14}}>
+          <div style={{fontFamily:'Cinzel,serif',color:'var(--gold)',fontSize:11,marginBottom:6,letterSpacing:'.08em'}}>🔧 Hallintälinkki</div>
+          <div style={{fontSize:10,color:'var(--steel)',marginBottom:8,lineHeight:1.5}}>Avaa toisella koneella jatkaaksesi hallintaa</div>
+          <div style={{fontSize:10,color:'var(--steel)',wordBreak:'break-all',lineHeight:1.4,marginBottom:8}}>{adminUrl}</div>
+          <button style={{...S.btn('outline',true),fontSize:11,marginBottom:0}} onClick={()=>navigator.clipboard?.writeText(adminUrl).then(()=>{})}>Copy Admin Link</button>
+        </div>
+      </>}
+      <button style={{...S.btn('outline'),marginBottom:0,marginTop:8}} onClick={onClose}>Close</button>
     </div>
   </div>;
 }
@@ -767,6 +775,7 @@ function TournamentApp({initConfig, tourneyId, onReset}) {
 
   const standings = calcStandings(players,matches,config.bpTable);
   const viewerURL = `${window.location.origin}${window.location.pathname}?t=${tourneyId}`;
+  const adminURL  = `${window.location.origin}${window.location.pathname}?admin=${tourneyId}`;
   const tabs=[{k:'players',label:'Players'},{k:'round',label:'Round'},{k:'history',label:'History'},{k:'settings',label:'Settings'}];
 
   return (
@@ -774,7 +783,7 @@ function TournamentApp({initConfig, tourneyId, onReset}) {
       {toast   &&<Toast msg={toast.msg} err={toast.err}/>}
       {confirm &&<ConfirmModal {...confirm} onClose={()=>setConfirm(null)}/>}
       {showBP  &&<BPModal table={config.bpTable} onSave={t=>{setConfig(c=>({...c,bpTable:t}));setShowBP(false);showToast('BP table saved!');}} onClose={()=>setShowBP(false)}/>}
-      {showQR  &&<QRModal url={viewerURL} tourney={config.name} onClose={()=>setShowQR(false)}/>}
+      {showQR  &&<QRModal url={viewerURL} tourney={config.name} onClose={()=>setShowQR(false)} adminUrl={adminURL}/>}
 
       <div style={S.hdr}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
@@ -1049,12 +1058,18 @@ function App() {
 
   const params    = new URLSearchParams(window.location.search);
   const viewerId  = params.get('t');
+  const adminId   = params.get('admin');
 
   const hasSession = !!localStorage.getItem(SAVE_KEY);
-  const [started, setStarted] = useState(hasSession);
-  const [config,  setConfig]  = useState(null);
+  const [started,       setStarted]       = useState(hasSession || !!adminId);
+  const [config,        setConfig]        = useState(null);
+  const [remoteLoading, setRemoteLoading] = useState(!!adminId && !hasSession);
 
   const [tourneyId] = useState(()=>{
+    if (adminId) {
+      localStorage.setItem('wh_tourney_id', adminId);
+      return adminId;
+    }
     const stored = localStorage.getItem('wh_tourney_id');
     if (stored) return stored;
     const id = 'T' + Date.now().toString(36).toUpperCase();
@@ -1062,7 +1077,26 @@ function App() {
     return id;
   });
 
+  useEffect(()=>{
+    if (!adminId || hasSession) return;
+    fbOn(`tournaments/${adminId}`, val => {
+      if (val) {
+        localStorage.setItem(SAVE_KEY, JSON.stringify(val));
+        setRemoteLoading(false);
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    });
+  }, []);
+
   if (viewerId) return <ViewerScreen tourneyId={viewerId}/>;
+
+  if (remoteLoading) return (
+    <div style={{minHeight:'100vh',background:'var(--dark)',display:'flex',alignItems:'center',
+      justifyContent:'center',flexDirection:'column',gap:16}}>
+      <div style={{fontFamily:'Cinzel,serif',color:'var(--gold)',fontSize:14,letterSpacing:'.1em'}}>Ladataan turnausta…</div>
+      <div style={{fontSize:12,color:'var(--steel)'}}>Haetaan tietoja Firebasesta</div>
+    </div>
+  );
 
   function handleStart(cfg) {
     localStorage.removeItem(SAVE_KEY);
