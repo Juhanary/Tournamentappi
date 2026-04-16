@@ -1,4 +1,6 @@
 const { useState, useEffect, useCallback, useRef } = React;
+import HitCalculator from "./hitcalculator";
+
 
 // ═══════════════════════════════════
 //  COMPONENTS
@@ -752,8 +754,10 @@ function StartScreen({onStart}) {
       </div>
 
       <div style={{padding:'20px 16px',maxWidth:480,margin:'0 auto'}}>
-<button style={{...S.btn('outline'),marginBottom:12,fontSize:11,letterSpacing:'.06em'}} onClick={()=>setShowCalc(true)}>📊 Open hitcalculator</button>
-          <Card title="🎮 Peli">
+        <button style={{...S.btn('outline'),marginBottom:12,fontSize:11,letterSpacing:'.06em'}} onClick={()=>setShowCalc(true)}>
+          🧮 Open hit calculator
+        </button>
+        <Card title="🎮 Peli">
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
             {GAMES.map(g=>(
               <div key={g.k} onClick={()=>selectGame(g.k)}
