@@ -12,7 +12,7 @@ import { Picker } from "@react-native-picker/picker";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
-export default function App() {
+export default function HitCalculator() {
   const [cols, setCols] = useState(5);
   const [rows, setRows] = useState(5);
   const [baseSize, setBaseSize] = useState(25);

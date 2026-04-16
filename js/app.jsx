@@ -675,6 +675,7 @@ function StartScreen({onStart}) {
   const [scoring,   setScoring]   = useState('tow');
   const [bpTable,   setBpTable]   = useState(JSON.parse(JSON.stringify(DEFAULT_BP)));
   const [showBP,    setShowBP]    = useState(false);
+  const [showCalc,  setShowCalc]  = useState(false);
   const [roundScenarios, setRoundScenarios] = useState([]);
   const [roundMissions,  setRoundMissions]  = useState([]);
   const [editingRound,   setEditingRound]   = useState(null);
@@ -721,6 +722,8 @@ function StartScreen({onStart}) {
     <div style={{minHeight:'100vh',background:'var(--dark)',
       backgroundImage:'radial-gradient(ellipse at 20% 10%,rgba(139,0,0,.18) 0%,transparent 55%)'}}>
 
+        {showCalc&&<HitCalculator onClose={()=>setShowCalc(false)}/>}
+
       {showBP&&<BPModal table={bpTable}
         onSave={t=>{setBpTable(t);setShowBP(false);}}
         onClose={()=>setShowBP(false)}/>}
@@ -749,8 +752,8 @@ function StartScreen({onStart}) {
       </div>
 
       <div style={{padding:'20px 16px',maxWidth:480,margin:'0 auto'}}>
-<button style={{...S.btn('outline'),marginBottom:12,fontSize:11,letterSpacing:'.06em'}} onClick={()=>setShowBP(true)}>📊 Edit Scoring Table</button>
-        <Card title="🎮 Peli">
+<button style={{...S.btn('outline'),marginBottom:12,fontSize:11,letterSpacing:'.06em'}} onClick={()=>setShowCalc(true)}>📊 Open hitcalculator</button>
+          <Card title="🎮 Peli">
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
             {GAMES.map(g=>(
               <div key={g.k} onClick={()=>selectGame(g.k)}
@@ -1330,7 +1333,6 @@ function TournamentApp({initConfig, tourneyId, onReset}) {
   const [showQR,       setShowQR]       = useState(false);
   const [showExport,   setShowExport]   = useState(false);
   const [showSave,     setShowSave]     = useState(false);
-    const [showCalc,     setShowCalc]     = useState(false);
 
   const [showSettings, setShowSettings] = useState(false);
   const [lightMode,    setLightMode]    = useState(()=>localStorage.getItem('wh_theme')==='light');
@@ -1410,7 +1412,6 @@ function TournamentApp({initConfig, tourneyId, onReset}) {
       {showExport   &&<ExportModal onClose={()=>setShowExport(false)} onExport={msg=>{setShowExport(false);showToast(msg);}} standings={standings} matches={matches} config={config} players={players}/>}
       {showSave     &&<SaveModal adminUrl={adminURL} onClose={()=>setShowSave(false)} onCopy={()=>showToast('Admin-linkki kopioitu!')}/>}
       {showSettings &&<SettingsModal config={config} setConfig={setConfig} lightMode={lightMode} setLightMode={setLightMode} onClose={()=>setShowSettings(false)} onReset={onReset} setConfirm={setConfirm}/>}
-      {showCalc     &&<HitCalcModal onClose={()=>setShowCalc(false)}/>}
       <div style={S.hdr}>
         <div style={S.h1}>{config.name}</div>
         <div style={S.hsub}>Round {round}/{config.rounds} &nbsp;·&nbsp; {activePlayers.length} players &nbsp;·&nbsp; {config.tables} tables
@@ -1422,7 +1423,6 @@ function TournamentApp({initConfig, tourneyId, onReset}) {
             {icon:'💾',label:'Save Tournament',fn:()=>setShowSave(true)},
             {icon:'📤',label:'Export tournament',fn:()=>setShowExport(true)},
             {icon:'⚙',label:'Settings',fn:()=>setShowSettings(true)},
-            {icon:'🧮',label:'Hit Calculator',fn:()=>setShowCalc(true)},
           ].map(b=>(
             <button key={b.label} onClick={b.fn}
               style={{background:'none',border:'1px solid rgba(201,168,76,.3)',borderRadius:3,
