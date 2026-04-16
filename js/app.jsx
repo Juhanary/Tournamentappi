@@ -1,5 +1,5 @@
 const { useState, useEffect, useCallback, useRef } = React;
-import HitCalculator from "./hitcalculator";
+// HitCalculator is loaded globally from hitcalculator.js
 
 
 // ═══════════════════════════════════
@@ -724,8 +724,8 @@ function StartScreen({onStart}) {
     <div style={{minHeight:'100vh',background:'var(--dark)',
       backgroundImage:'radial-gradient(ellipse at 20% 10%,rgba(139,0,0,.18) 0%,transparent 55%)'}}>
 
-        {showCalc&&<HitCalculator onClose={()=>setShowCalc(false)}/>}
-
+      {showCalc&&<HitCalculator onClose={()=>setShowCalc(false)}/>}
+     
       {showBP&&<BPModal table={bpTable}
         onSave={t=>{setBpTable(t);setShowBP(false);}}
         onClose={()=>setShowBP(false)}/>}
