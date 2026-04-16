@@ -749,7 +749,7 @@ function StartScreen({onStart}) {
       </div>
 
       <div style={{padding:'20px 16px',maxWidth:480,margin:'0 auto'}}>
-
+<button style={{...S.btn('outline'),marginBottom:12,fontSize:11,letterSpacing:'.06em'}} onClick={()=>setShowBP(true)}>📊 Edit Scoring Table</button>
         <Card title="🎮 Peli">
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
             {GAMES.map(g=>(
